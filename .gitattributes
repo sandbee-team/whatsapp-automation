@@ -1,0 +1,40 @@
+# Line endings (2026-09-15).
+#
+# This repo is developed on Windows (core.autocrlf=true) but every shell
+# script, Dockerfile and compose file it produces RUNS ON LINUX, on the EC2
+# box. A .sh file checked out with CRLF fails there immediately and
+# confusingly:
+#
+#   ./build-frontends.sh: /usr/bin/env: 'bash\r': No such file or directory
+#
+# So: normalise text to LF in the repository, and force LF on checkout for
+# everything that Linux executes or parses. Windows editors handle LF fine;
+# Linux does not handle CRLF.
+
+# Default: let git normalise text files to LF in the object store.
+* text=auto
+
+# Executed or parsed on Linux - must be LF on disk, on every platform.
+*.sh            text eol=lf
+Dockerfile      text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+Caddyfile       text eol=lf
+*.env.example   text eol=lf
+.dockerignore   text eol=lf
+
+# Lua scripts are read by Redis at runtime from inside the image.
+*.lua           text eol=lf
+
+# SQL migrations are applied by the migrate role on Linux.
+*.sql           text eol=lf
+
+# Binary - never touch.
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.ico           binary
+*.woff          binary
+*.woff2         binary
+*.pdf           binary

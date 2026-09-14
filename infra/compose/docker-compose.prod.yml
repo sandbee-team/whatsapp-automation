@@ -48,8 +48,8 @@ name: wp
 #
 # 1 GB SIZING PASS (2026-09-15, demo/test box only - resize before a real
 # tenant): every service below EXCEPT session-worker now carries a mem_limit
-# sized to fit postgres + pgbouncer + redis + redis-sig + pgbouncer + api +
-# admin-api + cron + relay + caddy in 1024 MB total:
+# sized to fit postgres + pgbouncer + redis + redis-sig + api + admin-api +
+# cron + relay + caddy in 1024 MB total:
 #
 #   postgres 200m + pgbouncer 32m + redis 48m + redis-sig 48m + api 176m +
 #   admin-api 128m + cron 96m + relay 96m + caddy 64m = 888m of container
@@ -307,4 +307,121 @@ services:
     ports:
       - '127.0.0.1:${ADMIN_PORT:-3001}:3001'
     # 1 GB box sizing pass: smaller surface than `api` (staff-only traffic,
-    # no SSE, no
+    # no SSE, no webhook fan-out), sized as a floor for that.
+    mem_limit: 128m
+    stop_grace_period: 20s
+
+  cron:
+    <<: *backend
+    environment:
+      ROLE: cron
+    # 512m (this role's dev-compose figure) does not fit the 1 GB sizing pass
+    # above alongside everything else this box must run; 96m is a floor for
+    # its periodic sweeps (reaper, reconciler, wallet, retention) against a
+    # handful of demo tenants, not a tuned ceiling. Raise it back toward 512m
+    # once this moves off a 1 GB box (aws-first-deployment.md §1 option b).
+    mem_limit: 96m
+    stop_grace_period: 15s
+
+  relay:
+    <<: *backend
+    environment:
+      ROLE: relay
+    # Same rationale as cron's mem_limit above: 96m is a 1-GB-box floor for
+    # draining outbox_events at light demo volume, not the 512m this role
+    # gets on a properly sized box.
+    mem_limit: 96m
+    stop_grace_period: 15s
+
+  # The edge. Terminates TLS for app.<domain> and admin.<domain>, reverse
+  # proxies `/v1/*` -> api:3000 and `/admin/v1/*` -> admin-api:3001, and
+  # serves the two built SPAs as static files - see infra/nginx/Caddyfile and
+  # infra/nginx/README.md for what it does and why. website/ is deliberately
+  # NOT served here (out of scope for this box).
+  #
+  # NOT part of the `x-backend` anchor: this is not one of the five
+  # `wp-backend` image roles, it is a separate, off-the-shelf image.
+  caddy:
+    # Pinned tag, not `:latest` or `:2` - the same "never a floating tag"
+    # discipline build-image.sh applies to trivy. `-alpine` keeps the image
+    # small, which matters on a box this memory-constrained.
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    # No `condition: service_healthy` (unlike the `x-backend` anchor's
+    # postgres/redis/redis-sig waits): neither api nor admin-api declares a
+    # healthcheck today (no /healthz - see aws-first-deployment.md's closing
+    # "Not covered yet" note), so plain startup ordering is the best
+    # available. A request arriving before they are ready is a proxy error
+    # Caddy surfaces to the browser, not a crash.
+    depends_on:
+      - api
+      - admin-api
+    ports:
+      # The ONLY service on this box allowed to publish to all interfaces -
+      # api and admin-api stay loopback-only (see their `ports:` comments
+      # above) and this is what proxies to them instead.
+      - '80:80'
+      - '443:443'
+    environment:
+      # Caddy reads `{$VAR}` placeholders in the Caddyfile from ITS OWN
+      # process environment, which is a separate mechanism from compose's
+      # `${VAR}` interpolation used elsewhere in this file (see the
+      # file-header comment on interpolation vs env_file - the same
+      # distinction applies a second time here, one level down: compose
+      # interpolates `${APP_DOMAIN}` etc. below from /opt/wp/.env when
+      # building this `environment:` block, then hands the resulting literal
+      # values to the caddy container as real env vars, which Caddy in turn
+      # substitutes into the Caddyfile at load time).
+      APP_DOMAIN: ${APP_DOMAIN:?APP_DOMAIN is required, e.g. app.example.com}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN:?ADMIN_DOMAIN is required, e.g. admin.example.com}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required - Let's Encrypt sends renewal/expiry notices here}
+    volumes:
+      # Default is an ABSOLUTE host path, deliberately unlike WP_ENV_FILE's
+      # /etc/wp default above but for the same "must resolve regardless of
+      # where compose is invoked from" reason: unlike the app services'
+      # env_file (a single file the operator places by hand once),
+      # ship-image.sh rsyncs infra/nginx/Caddyfile to this exact path
+      # alongside docker-compose.prod.yml on every deploy, so a relative
+      # `../nginx/Caddyfile` would only resolve by accident of the repo's own
+      # directory layout, which does not exist on the box (ADR 0003: no repo
+      # checkout there).
+      - ${WP_CADDYFILE:-/opt/wp/Caddyfile}:/etc/caddy/Caddyfile:ro
+      # The two built SPAs. `build-frontends.sh` builds them and
+      # `ship-frontends.sh` rsyncs the resulting dist/ trees to these host
+      # paths (see infra/deploy/) - Caddy only ever reads them.
+      - ${WP_APP_FRONTEND_DIR:-/opt/wp/frontends/app}:/srv/app:ro
+      - ${WP_ADMIN_FRONTEND_DIR:-/opt/wp/frontends/admin}:/srv/admin:ro
+      # Named volumes, NOT bind mounts: this is where Caddy keeps the ACME
+      # account key and issued certificates (caddy_data) and its
+      # auto-generated internal config/state (caddy_config). Both must
+      # survive a container restart/recreate or every restart would
+      # re-request certificates from Let's Encrypt and risk its rate limits.
+      - caddy_data:/data
+      - caddy_config:/config
+    # 1 GB box sizing pass (see file-header comment): static file serving +
+    # reverse proxying for two low-traffic demo panels is light; this is a
+    # floor, not a measured ceiling.
+    mem_limit: 64m
+    security_opt:
+      - no-new-privileges:true
+    # NOT read_only: Caddy writes its ACME state under /data and /config
+    # (mounted above as named volumes, not the rootfs) but its image also
+    # writes small amounts of scratch state elsewhere in its rootfs -
+    # unlike the app/backend roles, nothing here justifies the extra
+    # hardening effort of finding and tmpfs-mounting every such path.
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '5'
+
+volumes:
+  postgres_data:
+  redis_data:
+  redis_sig_data:
+  # Caddy's ACME account key, issued certificates, and OCSP staples (data)
+  # and its auto-persisted config snapshot (config). Named volumes so both
+  # survive `docker compose up`/restart/recreate - losing them mid-life
+  # means re-requesting certs from Let's Encrypt, which is rate-limited.
+  caddy_data:
+  caddy_config:

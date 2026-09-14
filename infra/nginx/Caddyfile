@@ -56,13 +56,19 @@
 			# proxy_buffering off + proxy_read_timeout 1h).
 			flush_interval -1
 
-			# REPLACE X-Forwarded-For, never append. `header_up` with a plain
-			# value overwrites the header outright (Caddy does not append
-			# unless you use `+X-Forwarded-For`), which is what
-			# app-backend's TRUST_PROXY / admin-api's rate limiter needs -
-			# an appended header would let a caller prepend a spoofed IP
-			# ahead of the real one (README's "X-Forwarded-For rewrite"
-			# section).
+			# REPLACE X-Forwarded-For, never append - this is the exact
+			# directive infra/nginx/README.md's "X-Forwarded-For rewrite"
+			# section specifies. `header_up` with a bare value (no `+`
+			# prefix) sets/replaces the header outright rather than
+			# appending, which is what app-backend's TRUST_PROXY /
+			# admin-api's rate limiter and ADMIN_IP_ALLOWED_CIDRS need - an
+			# appended, comma-joined header would let a caller prepend a
+			# spoofed IP ahead of the real one. VERIFY ONCE LIVE (no Caddy
+			# binary was available to test this in the sandbox that wrote
+			# this file):
+			#   curl -sH 'X-Forwarded-For: 1.2.3.4' https://<host>/v1/... and
+			#   confirm the backend/access log shows only the real client IP,
+			#   never "1.2.3.4, <real-ip>".
 			header_up X-Forwarded-For {remote_ip}
 		}
 	}
@@ -70,10 +76,12 @@
 	# Everything else: serve the built SPA, falling back to index.html for
 	# any path Caddy can't find on disk so TanStack Router's client-side
 	# routes deep-link correctly (a hard refresh on e.g. /inbox/123 must not
-	# 404).
+	# 404). Caddy sorts directives by its own fixed execution order
+	# regardless of the order written here, but try_files-then-file_server
+	# matches the order the upstream docs use for this exact SPA idiom.
 	root * /srv/app
-	file_server
 	try_files {path} /index.html
+	file_server
 
 	# Security headers (HSTS, CSP, etc.) are deliberately NOT set here - the
 	# README says they belong per-route in each application, not the edge,
@@ -107,6 +115,6 @@
 	}
 
 	root * /srv/admin
-	file_server
 	try_files {path} /index.html
+	file_server
 }

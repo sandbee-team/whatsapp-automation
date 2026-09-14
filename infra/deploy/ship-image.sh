@@ -9,8 +9,11 @@
 # What it does on the remote, in order:
 #   1. load the image tarball
 #   2. run migrations to completion (ROLE=migrate, one-shot)
-#   3. restart api, cron and relay
+#   3. restart api, admin-api, cron and relay
 #   4. restart session-worker LAST, and only if it was already running
+#   5. bring up caddy (first deploy) or reload it (Caddyfile changed) - see
+#      infra/nginx/Caddyfile; frontend files themselves ship separately via
+#      ship-frontends.sh
 #
 # Why the worker is last and conditional: it holds live WhatsApp sockets and
 # is given 45s to drain in-flight sends. Restarting it is the most disruptive
@@ -41,6 +44,13 @@ rsync -avP --partial "$LOCAL_TARBALL" "${REMOTE}:${REMOTE_DIR}/"
 echo "==> copying the compose file"
 rsync -av "${REPO_ROOT}/infra/compose/docker-compose.prod.yml" "${REMOTE}:${COMPOSE}"
 
+# The edge config. Copied alongside the compose file (not by
+# ship-frontends.sh) because it changes with backend routing/proxy config,
+# not with a frontend build - and the `caddy` service's WP_CADDYFILE default
+# (/opt/wp/Caddyfile) expects it at exactly this path.
+echo "==> copying the Caddyfile"
+rsync -av "${REPO_ROOT}/infra/nginx/Caddyfile" "${REMOTE}:${REMOTE_DIR}/Caddyfile"
+
 echo "==> loading and restarting on ${REMOTE}"
 ssh "${REMOTE}" bash -seu <<REMOTE_SCRIPT
 cd "${REMOTE_DIR}"
@@ -66,6 +76,19 @@ if docker compose -f "${COMPOSE}" ps --services --filter status=running | grep -
 else
   echo "--> session-worker is not running; leaving it stopped"
 fi
+
+echo "--> starting caddy if not already running (first deploy), else reloading it"
+# `up -d --no-deps` is a no-op if caddy is already running with an unchanged
+# definition, so this is safe to run on every deploy - it is what actually
+# creates the container the first time this script runs against a box.
+docker compose -f "${COMPOSE}" up -d --no-deps caddy
+# On subsequent deploys where caddy was already running, `up -d` alone does
+# not make it re-read a changed Caddyfile (the bind mount's host file
+# changed, not the container definition), so reload explicitly. Errors here
+# are non-fatal to the deploy (e.g. first run, or caddy already picked up the
+# file some other way) - `|| true` matches this script's own tolerance for
+# session-worker being absent above.
+docker compose -f "${COMPOSE}" exec -T caddy caddy reload --config /etc/caddy/Caddyfile || true
 
 echo "--> current state"
 docker compose -f "${COMPOSE}" ps
