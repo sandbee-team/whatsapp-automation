@@ -68,7 +68,7 @@ proxy_set_header X-Forwarded-For $remote_addr;
 ```
 
 ```
-header X-Forwarded-For {remote_ip}
+header X-Forwarded-For {http.request.remote.host}
 ```
 
 ## Security headers

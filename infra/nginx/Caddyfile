@@ -63,13 +63,23 @@
 			# appending, which is what app-backend's TRUST_PROXY /
 			# admin-api's rate limiter and ADMIN_IP_ALLOWED_CIDRS need - an
 			# appended, comma-joined header would let a caller prepend a
-			# spoofed IP ahead of the real one. VERIFY ONCE LIVE (no Caddy
-			# binary was available to test this in the sandbox that wrote
-			# this file):
-			#   curl -sH 'X-Forwarded-For: 1.2.3.4' https://<host>/v1/... and
-			#   confirm the backend/access log shows only the real client IP,
-			#   never "1.2.3.4, <real-ip>".
-			header_up X-Forwarded-For {remote_ip}
+			# spoofed IP ahead of the real one.
+			#
+			# THE PLACEHOLDER NAME IS LOAD-BEARING. This said `{remote_ip}`
+			# until 2026-09-15 - not a Caddy placeholder at all, so Caddy
+			# passed the eight literal characters through and every backend
+			# received `X-Forwarded-For: {remote_ip}`. It fails silently:
+			# Caddy logs no error, the app boots fine, and only an IP-derived
+			# decision goes wrong. It cost a live debugging session - admin
+			# login returned 403 "This network is not allow-listed" even with
+			# ADMIN_IP_ALLOWED_CIDRS=0.0.0.0/0, because isIpAllowed
+			# (packages/server-kit/src/auth/cidr.ts) parses the header value
+			# as a dotted quad, and the literal string is not one, so it
+			# fail-closed BEFORE reaching the /0 prefix that matches
+			# everything. Verify after any edit here:
+			#   docker compose logs caddy | grep X-Forwarded-For
+			# must show a real address, never a `{...}` token.
+			header_up X-Forwarded-For {http.request.remote.host}
 		}
 	}
 
@@ -122,7 +132,7 @@
 			# config.ts) - both read req.ip via ADMIN_TRUST_PROXY, which
 			# only makes sense if this header is trustworthy, i.e. replaced,
 			# never appended.
-			header_up X-Forwarded-For {remote_ip}
+			header_up X-Forwarded-For {http.request.remote.host}
 		}
 	}
 
