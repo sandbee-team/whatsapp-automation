@@ -1,0 +1,42 @@
+-- P07 (session-auth-store) FIX-B CRITICAL - migration 0021.
+-- wp_app currently has NO grant at all on `whatsapp_instances` (migration
+-- 0010 deliberately left it to P08 - "P08 owns this table's logic and adds
+-- whatever the connect/pair endpoints need when it lands"). But P07's own
+-- auth-store queries already depend on `whatsapp_instances` UNDER wp_app,
+-- today, independent of P08:
+--
+--   - `session-creds-upsert.sql` (INSERT arm AND UPDATE arm) and
+--     `session-creds-classify-miss.sql` read `whatsapp_instances.id`,
+--     `.client_id`, `.session_epoch` via an `EXISTS`/LEFT JOIN predicate
+--     (FIX-A CRITICAL-1(b)/(c) epoch-blind-write guard).
+--   - `session-purge-epoch-bump.sql` UPDATEs `whatsapp_instances.
+--     session_epoch` (`session_epoch = session_epoch + 1`) AND
+--     `whatsapp_instances.updated_at` (`updated_at = now()`) in the same
+--     statement.
+--
+-- Every superuser-pool-backed fixture in P07's own test suite masked this:
+-- the dev/test pool connects as a superuser/BYPASSRLS role, so these
+-- predicates always evaluated successfully in CI regardless of what wp_app
+-- itself could actually see or touch. Under the REAL `wp_app` production
+-- role, every one of these statements silently matches zero rows (an
+-- ordinary permission-denied on the underlying table read/write, surfaced by
+-- Postgres as an authorization failure on the `EXISTS`/`UPDATE` reference
+-- itself), so EVERY creds write/purge fails in production. This migration
+-- grants EXACTLY the columns the three statements above actually read/write
+-- - nothing more:
+--
+--   - SELECT (id, client_id, session_epoch): the EXISTS-predicate/read
+--     columns `session-creds-upsert.sql` and `session-creds-classify-miss.sql`
+--     touch.
+--   - UPDATE (session_epoch, updated_at): the two columns
+--     `session-purge-epoch-bump.sql`'s SET clause actually writes.
+--
+-- Deliberately NOT a broad/table-level instance grant: this is the minimum
+-- surface the P07 auth-store epoch predicates need. P08 (which owns this
+-- table's connect/pair/pause logic) adds whatever ELSE the connect/pair
+-- endpoints need when it lands - this migration does not anticipate that.
+-- Nothing new for wp_admin_app (already has table-level SELECT from
+-- migration 0010) or wp_scheduler (its claim-join column grant from
+-- migration 0010 is untouched) - neither role's surface changes here.
+GRANT SELECT (id, client_id, session_epoch) ON whatsapp_instances TO wp_app;
+GRANT UPDATE (session_epoch, updated_at) ON whatsapp_instances TO wp_app;

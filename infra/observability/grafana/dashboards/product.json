@@ -1,0 +1,276 @@
+{
+  "uid": "wp-product",
+  "title": "WP product: inbound, broadcast, groups, wallet",
+  "tags": ["wp"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Inbound events by kind",
+      "description": "Inbound socket events seen by the dispatcher, by kind (echo, message, receipt, ignored). Runbook: docs/RUNBOOK.md#product.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (kind) (rate(wp_inbound_events_total[5m]))",
+          "legendFormat": "{{kind}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Receipts by event type",
+      "description": "Delivery receipts written to delivery_events, by event type (delivered, read, failed). Runbook: docs/RUNBOOK.md#product.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (event_type) (rate(wp_receipts_total[5m]))",
+          "legendFormat": "{{event_type}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Inbound anomalies",
+      "description": "Unmatched receipts, admission shedding, dead letters by error class, opt-out detections, id collisions, and signal decrypt failures by cause. Runbook: docs/RUNBOOK.md#product.",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(wp_receipt_unmatched_total[5m])",
+          "legendFormat": "receipt unmatched"
+        },
+        { "refId": "B", "expr": "rate(wp_inbound_shed_total[5m])", "legendFormat": "inbound shed" },
+        {
+          "refId": "C",
+          "expr": "sum by (error_class) (rate(wp_inbound_dead_letters_total[5m]))",
+          "legendFormat": "dead letter {{error_class}}"
+        },
+        {
+          "refId": "D",
+          "expr": "rate(wp_optout_detected_total[5m])",
+          "legendFormat": "opt-out detected"
+        },
+        {
+          "refId": "E",
+          "expr": "rate(wp_inbound_id_collision_total[5m])",
+          "legendFormat": "id collision"
+        },
+        {
+          "refId": "F",
+          "expr": "sum by (cause) (rate(wp_signal_decrypt_failure_total[5m]))",
+          "legendFormat": "decrypt fail {{cause}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "broadcast recipient funnel (1h)",
+      "description": "campaign_recipients rows entering a status over the trailing hour, by status. Runbook: docs/RUNBOOK.md#product.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (status) (increase(wp_broadcast_recipients_total[1h]))",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "broadcast expansion lag p99",
+      "description": "p99 seconds between a campaign snapshot_done_at and an expansion batch commit. Threshold 300s. Runbook: docs/RUNBOOK.md#product.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(wp_broadcast_expansion_lag_seconds_bucket[15m])))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 300 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Stranded epoch jobs",
+      "description": "Fleet-wide count of message_jobs rows blocked_needs_review with unresolved_reason session_epoch_advanced. Runbook: docs/RUNBOOK.md#product.",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "max(wp_stranded_epoch_jobs)" }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Group sends by result",
+      "description": "Group message send results, by result (sent, failed, group_forbidden). Runbook: docs/RUNBOOK.md#product.",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (result) (rate(wp_group_sends_total[5m]))",
+          "legendFormat": "{{result}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Group sync duration p95",
+      "description": "p95 seconds taken by one wa_groups sync (groupFetchAllParticipating) for one instance. Runbook: docs/RUNBOOK.md#product.",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(wp_group_sync_seconds_bucket[15m])))"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Wallet debits and refunds",
+      "description": "Wallet debit events by price key, and refund events by reason. Runbook: docs/RUNBOOK.md#product.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (price_key) (rate(wp_wallet_debits_total[5m]))",
+          "legendFormat": "debit {{price_key}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (reason) (rate(wp_wallet_refunds_total[5m]))",
+          "legendFormat": "refund {{reason}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Wallet drift (absolute, minor units)",
+      "description": "Checkpoint-vs-ledger wallet balance drift, summed in absolute minor units - must be 0. Runbook: docs/RUNBOOK.md#alert-wallet-drift.",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum(abs(wp_wallet_drift_minor))" }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "Clients with an empty wallet",
+      "description": "Count of clients whose wallet is currently in the empty state. Runbook: docs/RUNBOOK.md#product.",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "max(wp_wallet_clients_empty)" }],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Wallet top-ups (1d)",
+      "description": "Tenant top-up requests over the trailing day, by status. Runbook: docs/RUNBOOK.md#product.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (status) (increase(wp_wallet_topups_total[1d]))",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Notifications by kind and channel",
+      "description": "Notification outbox fan-out rows written, by kind and channel. Runbook: docs/RUNBOOK.md#product.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (kind, channel) (rate(wp_notifications_total[5m]))",
+          "legendFormat": "{{kind}}/{{channel}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    }
+  ]
+}

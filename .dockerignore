@@ -1,0 +1,53 @@
+# .dockerignore (2026-09-14) - keeps the build context small and keeps secrets
+# out of the image. Docker sends the ENTIRE context to the daemon before the
+# first instruction runs, so every entry here is also a build-speed fix.
+#
+# The single most important lines are `.secrets` and `demo`:
+#   - `.secrets/` holds the machine-local dev env file (DB password, Gmail app
+#     password, key-ring path). It must never enter an image layer.
+#   - `demo/` is ~450 MB of reference repositories (ADR 0012) that no
+#     application file imports from. Shipping it would dominate the context.
+
+# Dependencies - reinstalled inside the image from the lockfile
+node_modules
+**/node_modules
+
+# Build output - the image builds its own; a stale host dist must never win
+dist
+**/dist
+**/.next
+website/out
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# Secrets - never in an image layer
+.secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# Reference repos (ADR 0012) - imported by nothing under app/ admin/ website/
+# packages/ db/ scripts/; ~450 MB
+demo
+
+# Project memory, agent config and docs - not needed to build or run
+.memory
+.claude
+docs
+plan
+*.md
+!db/migrations/README.md
+
+# Local runtime state
+.data
+coverage
+**/coverage
+.vscode
+.idea
+
+# Tests and fixtures - the image runs the gate's OUTPUT, never the gate
+**/*.test.ts
+**/*.test.tsx
+**/__tests__
+**/__test-support__
+**/test/fixtures

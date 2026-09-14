@@ -1,0 +1,292 @@
+{
+  "uid": "wp-fleet",
+  "title": "WP fleet",
+  "tags": ["wp"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Sessions per worker",
+      "description": "Sessions currently held by each worker (legend: worker instance) against its derived session cap. Runbook: docs/RUNBOOK.md#fleet.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "wp_worker_sessions", "legendFormat": "{{instance}}" },
+        { "refId": "B", "expr": "wp_worker_session_cap", "legendFormat": "{{instance}} cap" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Connected vs desired-online instances",
+      "description": "Fleet-wide connected instance count against desired-online (the session-availability SLO numerator/denominator). Runbook: docs/RUNBOOK.md#fleet.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "max(wp_instances_connected)", "legendFormat": "connected" },
+        {
+          "refId": "B",
+          "expr": "max(wp_instances_desired_online)",
+          "legendFormat": "desired online"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Session availability ratio",
+      "description": "Connected instances divided by desired-online instances - the fleet-wide session-availability SLO. Threshold 0.995. Runbook: docs/RUNBOOK.md#fleet.",
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(wp_instances_connected) / clamp_min(max(wp_instances_desired_online), 1)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 0.995 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Unowned instances",
+      "description": "Desired-online instances with no live lease - must be 0. Runbook: docs/RUNBOOK.md#alert-instances-unowned.",
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "max(wp_instances_unowned)" }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Fleet capacity headroom",
+      "description": "Sum of published worker session caps minus the desired-online instance count. Runbook: docs/RUNBOOK.md#fleet.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "max(wp_fleet_capacity_headroom)" }],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Fleet headroom ratio",
+      "description": "Capacity headroom divided by total published capacity (headroom + desired-online). Threshold 0.2 (20% headroom). Runbook: docs/RUNBOOK.md#fleet.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(wp_fleet_capacity_headroom) / clamp_min(max(wp_fleet_capacity_headroom) + max(wp_instances_desired_online), 1)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 0.2 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Connect bucket wait p99",
+      "description": "p99 seconds a session waited in the connect-rate bucket before being allowed to link. Runbook: docs/RUNBOOK.md#fleet.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(wp_connect_bucket_wait_seconds_bucket[5m])))"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Worker event-loop lag p99",
+      "description": "p99 event-loop delay in milliseconds, per worker. Threshold line 200 ms. Runbook: docs/RUNBOOK.md#fleet.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "wp_worker_eventloop_lag_p99", "legendFormat": "{{instance}}" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 200 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Session RSS footprint (estimated) and box RSS",
+      "description": "Estimated per-session RSS footprint (threshold 60 MiB) and host-level used memory, per worker. Runbook: docs/RUNBOOK.md#fleet.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "wp_session_rss_bytes_est",
+          "legendFormat": "{{instance}} per-session est"
+        },
+        { "refId": "B", "expr": "wp_box_rss_bytes", "legendFormat": "{{instance}} box rss" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 62914560 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Fence regressions",
+      "description": "Minted fences not strictly greater than the last fence seen for the instance - should never fire. Runbook: docs/RUNBOOK.md#fleet.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "wp_fence_regression_total" }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Lease loss and takeovers",
+      "description": "Session leases self-fenced (by cause) and lease takeovers (a mint replacing a different previous owner). Runbook: docs/RUNBOOK.md#fleet.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (cause) (rate(wp_lease_lost_total[5m]))",
+          "legendFormat": "{{cause}}"
+        },
+        { "refId": "B", "expr": "rate(wp_lease_takeovers_total[5m])", "legendFormat": "takeovers" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Shed instances not re-grabbed",
+      "description": "Fleet-wide rate of shed instances not re-grabbed by another worker within two scan cycles. Runbook: docs/RUNBOOK.md#fleet.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum(rate(wp_shed_no_taker_total[5m]))" }],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Reconnect attempts by reason",
+      "description": "Reconnect attempts actually scheduled, by disconnect reason class. Runbook: docs/RUNBOOK.md#fleet.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 48 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (reason) (rate(wp_reconnect_attempts_total[5m]))",
+          "legendFormat": "{{reason}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Link state distribution (linked count)",
+      "description": "Count of instances currently linked (link_state == 2), grouped by role. Instance-labelled gauge aggregated away by role, not by instance/client. Runbook: docs/RUNBOOK.md#fleet.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count by (role) (wp_instance_link_state == 2)",
+          "legendFormat": "{{role}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    }
+  ]
+}

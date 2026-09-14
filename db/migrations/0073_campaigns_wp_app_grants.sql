@@ -1,0 +1,25 @@
+-- P28 (admin-internal-api-and-panel) - migration 0073. Grants `wp_app` its
+-- missing privileges on `campaigns`.
+--
+-- WHY THIS EXISTS: migration 0064 granted `wp_scheduler` SELECT/INSERT/UPDATE
+-- on `campaigns` and granted `wp_app` SELECT/INSERT/UPDATE on the two sibling
+-- tables (`campaign_recipients`, `campaign_counters`) - but never on
+-- `campaigns` itself. Every tenant broadcast path (`modules/broadcasts/
+-- broadcasts.repo.ts` creates campaigns, `lifecycle.service.ts` transitions
+-- their status) therefore runs against a table `wp_app` cannot read or
+-- write. The gap was invisible for six phases because the dev/test pool
+-- connects as the database owner and `TenantDb.withTenant` issues no
+-- `SET LOCAL ROLE`; P28's `withStaffMutation` is the first code path that
+-- really enters `wp_app` (`SET LOCAL ROLE wp_app`) before touching
+-- `campaigns`, and the staff campaign-cancel route failed with
+-- `permission denied for table campaigns` (SQLSTATE 42501). Same defect
+-- class as migration 0072 (`wallet_ledger_ext_refs`): a production pool
+-- that actually connects as `wp_app` would have had no working broadcast
+-- feature at all. Recorded as a founder/ops check in the P28 session log.
+--
+-- Scope: exactly the privileges the sibling tables already carry for
+-- `wp_app` (SELECT, INSERT, UPDATE - never DELETE; campaigns are cancelled,
+-- never deleted). `campaigns.id` is a uuid, so no sequence grant is needed.
+-- RLS on `campaigns` (ENABLE + FORCE, `tenant_isolation`) is untouched and
+-- still scopes every `wp_app` statement to the tenant GUC.
+GRANT SELECT, INSERT, UPDATE ON campaigns TO wp_app;

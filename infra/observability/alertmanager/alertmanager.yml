@@ -1,0 +1,42 @@
+# alertmanager.yml (P25 Unit U4, step 5) - routes `severity: page` alerts to
+# a fast-repeat webhook receiver and `severity: ticket` alerts to a
+# slow-repeat one; both webhook URLs are read from a file, never inlined
+# (see the compose file's secrets mount and README.md's secrets contract).
+# The one inhibit rule silences the three `scope: worker` alerts for an
+# instance whose scrape target is already known down (ScrapeTargetDown),
+# so a dead process does not also page/ticket a storm of derived alerts for
+# the same instance.
+route:
+  group_by: ['alertname']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: page
+  routes:
+    - matchers:
+        - severity="page"
+      receiver: page
+      group_wait: 30s
+      repeat_interval: 4h
+    - matchers:
+        - severity="ticket"
+      receiver: ticket
+      group_wait: 5m
+      repeat_interval: 24h
+
+receivers:
+  - name: page
+    webhook_configs:
+      - url_file: /etc/wp/secrets/alertmanager-page-webhook-url
+        send_resolved: true
+  - name: ticket
+    webhook_configs:
+      - url_file: /etc/wp/secrets/alertmanager-ticket-webhook-url
+        send_resolved: true
+
+inhibit_rules:
+  - source_matchers:
+      - alertname="ScrapeTargetDown"
+    target_matchers:
+      - scope="worker"
+    equal: ['instance']

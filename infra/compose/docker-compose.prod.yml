@@ -1,0 +1,310 @@
+name: wp
+#
+# INTERPOLATION vs env_file - READ THIS BEFORE EDITING
+#
+# `env_file:` values are handed to the CONTAINER at run time. They are NOT
+# visible to compose's own `${...}` interpolation, which reads only the shell
+# environment and a `.env` file sitting NEXT TO this compose file. Mixing the
+# two up means `docker compose` refuses to parse the file at all:
+#
+#   error while interpolating services.postgres.environment.POSTGRES_PASSWORD:
+#   required variable POSTGRES_PASSWORD is missing a value
+#
+# So on the box there are TWO files, by design:
+#   /opt/wp/.env       - the few values compose itself interpolates
+#                        (POSTGRES_PASSWORD, WP_IMAGE, the paths below).
+#                        Copy infra/deploy/compose.env.example to it.
+#   /etc/wp/wp.env     - everything the application processes read.
+#                        Copy infra/deploy/wp.env.example to it.
+# Both are chmod 600, root-owned, and never committed.
+
+# docker-compose.prod.yml (2026-09-14) - the ONE file that runs the product on
+# a single EC2 box.
+#
+# HOW IT DIFFERS FROM docker-compose.dev.yml, and why each difference exists:
+#
+#   dev                                    prod
+#   ---------------------------------      -------------------------------------
+#   image: node:24 + the repo bind-        image: wp-backend:<tag>, built by the
+#   mounted, `pnpm exec tsx src/main.ts`   repo Dockerfile, `node dist/main.js`
+#   minio (S3 stand-in)                    real AWS S3 (OBJECT_STORE_DRIVER=s3)
+#   mailpit (mail sink)                    real Gmail SMTP
+#   ports published to 127.0.0.1           only the edge publishes a port
+#   profiles: worker/cron/relay            all four roles always run
+#
+# The four application services are the SAME image with a different ROLE, which
+# is how `app/backend/src/main.ts` already dispatches.
+#
+# BEFORE FIRST RUN
+#   1. Build and load the image (see infra/deploy/README.md).
+#   2. Put the env file at /etc/wp/wp.env on the host, chmod 600, root-owned.
+#      It is never baked into the image and never committed.
+#   3. Run migrations ONCE:  docker compose -f this-file run --rm migrate
+#
+# NOTE ON SIZING: `session-worker` declares mem_limit 3584m. A 1 GB free-tier
+# t3.micro CANNOT run it (see docs/runbooks/aws-first-deployment.md §1). On a
+# box that small, start everything EXCEPT session-worker; enqueue works,
+# delivery does not.
+#
+# 1 GB SIZING PASS (2026-09-15, demo/test box only - resize before a real
+# tenant): every service below EXCEPT session-worker now carries a mem_limit
+# sized to fit postgres + pgbouncer + redis + redis-sig + pgbouncer + api +
+# admin-api + cron + relay + caddy in 1024 MB total:
+#
+#   postgres 200m + pgbouncer 32m + redis 48m + redis-sig 48m + api 176m +
+#   admin-api 128m + cron 96m + relay 96m + caddy 64m = 888m of container
+#   limits, leaving ~136m for the kernel, dockerd and container runtime
+#   overhead that sits OUTSIDE any cgroup limit above.
+#
+# THIS IS TIGHT, NOT COMFORTABLE. These numbers are floors picked to let each
+# process boot and serve light demo traffic, not headroom for real load - a
+# burst (a large query plan, a GC pause under a spike of concurrent signups)
+# can still push a container over its limit and get OOM-killed by the kernel
+# cgroup, or push the BOX over 1 GB and invite the kernel OOM killer to pick
+# any process at random. A SWAP FILE IS THEREFORE REQUIRED on this box (e.g.
+# `fallocate -l 1G /swapfile` + `mkswap` + `swapon`, persisted in `/etc/
+# fstab`) so a transient overshoot degrades as slower paging instead of a
+# killed container. This whole paragraph is the same honesty this file
+# already practises about session-worker: it works, it is not comfortable,
+# and docs/runbooks/aws-first-deployment.md §1 option (b) (a `t3.small`, 2 GB)
+# is the recommended fix once this is more than a demo.
+
+x-backend: &backend
+  image: ${WP_IMAGE:-wp-backend:latest}
+  restart: unless-stopped
+  env_file:
+    - ${WP_ENV_FILE:-/etc/wp/wp.env}
+  # The key ring is mounted read-only from the host, never copied into the
+  # image. `KEY_RING_PATH` in the env file must point at this container path.
+  volumes:
+    - ${WP_KEY_RING_DIR:-/etc/wp/keyring}:/keyring:ro
+  depends_on:
+    # pgbouncer, NOT postgres: DATABASE_URL names the pgbouncer host, so
+    # waiting only on postgres would let every role start against a pooler that
+    # is not yet accepting connections. pgbouncer itself depends on postgres
+    # being healthy, so this waits for both.
+    pgbouncer:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    redis-sig:
+      condition: service_healthy
+  # Read-only rootfs: in production the app writes nothing to its own
+  # filesystem (media goes to S3). /tmp stays writable for Node itself.
+  read_only: true
+  tmpfs:
+    - /tmp:size=64m
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: '10m'
+      max-file: '5'
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    # pg_stat_statements is carried over from the dev compose deliberately: it
+    # is the hot-query instrument the capacity work depends on, and turning it
+    # on later requires a restart.
+    command:
+      [
+        'postgres',
+        '-c',
+        'shared_preload_libraries=pg_stat_statements',
+        '-c',
+        'pg_stat_statements.track=all',
+      ]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-wp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-wp}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # No `ports:` - nothing outside this compose network may reach Postgres.
+    # 1 GB box sizing pass (see the file-header comment): a floor for a
+    # handful of demo tenants, not a tuned production shared_buffers budget.
+    mem_limit: 200m
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-wp} -d ${POSTGRES_DB:-wp}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '5'
+
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.24.1-p1
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-wp}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      DB_NAME: ${POSTGRES_DB:-wp}
+      AUTH_TYPE: scram-sha-256
+      # TRANSACTION mode is load-bearing, not a tuning choice: `withTenant`
+      # uses `SET LOCAL app.client_id`, which is transaction-scoped and
+      # therefore safe here. A session-scoped SET would NOT be.
+      POOL_MODE: transaction
+      DEFAULT_POOL_SIZE: ${PGBOUNCER_DEFAULT_POOL_SIZE:-60}
+      RESERVE_POOL_SIZE: ${PGBOUNCER_RESERVE_POOL_SIZE:-20}
+      MAX_CLIENT_CONN: ${PGBOUNCER_MAX_CLIENT_CONN:-4000}
+      SERVER_IDLE_TIMEOUT: 60
+      ADMIN_USERS: ${POSTGRES_USER:-wp}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # 1 GB box sizing pass: pgbouncer is a small C process; this is generous
+    # for MAX_CLIENT_CONN's default of 4000 connection SLOTS (not 4000
+    # threads - it multiplexes them onto DEFAULT_POOL_SIZE server
+    # connections), not a measured ceiling.
+    mem_limit: 32m
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'PGPASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required} psql -h 127.0.0.1 -p 5432 -U ${POSTGRES_USER:-wp} -d pgbouncer -c "SHOW POOLS" || exit 1',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '5'
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redis_data:/data
+    # 1 GB box sizing pass: a demo box holds little cache/control state; this
+    # is a floor, not a working-set measurement.
+    mem_limit: 48m
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '5'
+
+  # The SECOND Redis. `noeviction` is a correctness requirement, not tuning:
+  # this instance holds Signal session state, and evicting a key there breaks
+  # a linked WhatsApp number in a way only a re-scan fixes.
+  redis-sig:
+    image: redis:7
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory-policy', 'noeviction']
+    volumes:
+      - redis_sig_data:/data
+    # 1 GB box sizing pass: `noeviction` above means an OOM here fails hard
+    # (an OOM-killed container) rather than silently dropping keys, which is
+    # correct - but on a demo box holding at most a handful of linked
+    # numbers (session-worker is not even running, so this holds none until
+    # it is) this is a comfortable floor, not a ceiling for real session load.
+    mem_limit: 48m
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '5'
+
+  # One-shot. `docker compose run --rm migrate` before every deploy that ships
+  # a new migration. Never starts with `up` (profile-gated).
+  migrate:
+    <<: *backend
+    environment:
+      ROLE: migrate
+      # DIRECT to Postgres, deliberately bypassing PgBouncer. The migration
+      # runner serialises concurrent runs with `pg_advisory_lock`, which is
+      # SESSION-scoped (db/src/migrate.ts:122). Under PgBouncer's transaction
+      # pooling the lock can be taken on one backend and unlocked on another,
+      # so it would silently stop serialising and two deploys could migrate
+      # simultaneously. Set MIGRATE_DATABASE_URL in /etc/wp/wp.env.
+      DATABASE_URL: ${MIGRATE_DATABASE_URL:?MIGRATE_DATABASE_URL is required - it must point straight at postgres, not pgbouncer}
+    restart: 'no'
+    profiles: ['tools']
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *backend
+    environment:
+      ROLE: api
+    # Published on loopback only: the edge (Caddy, see infra/nginx/Caddyfile)
+    # terminates TLS and proxies to it. Never expose this port publicly.
+    ports:
+      - '127.0.0.1:${API_PORT:-3000}:3000'
+    # 1 GB box sizing pass: aws-first-deployment.md §1 estimates "a few
+    # hundred MB" for this role under real load; this is a floor for light
+    # demo traffic, not that headroom.
+    mem_limit: 176m
+    stop_grace_period: 20s
+
+  # Holds the Baileys sockets and does the actual sending.
+  # mem_limit and stop_grace_period are carried from the dev compose because
+  # both are load-bearing: the limit derives from WORKER_HEAP_BUDGET_MB (3072)
+  # plus non-heap overhead, and the 45s grace is what lets an in-flight send
+  # drain instead of being abandoned mid-flight.
+  session-worker:
+    <<: *backend
+    environment:
+      ROLE: session-worker
+      # NODE_OPTIONS IS MANDATORY HERE, and the value must EQUAL
+      # WORKER_HEAP_BUDGET_MB (default 3072). The role asserts this at boot and
+      # refuses to start otherwise:
+      #   HeapBudgetMismatchError: --max-old-space-size is not set in execArgv
+      #   or NODE_OPTIONS, but WORKER_HEAP_BUDGET_MB=3072 requires it to be set
+      #   and equal - refusing to start with an unverified heap ceiling
+      # That check exists because the session cap is DERIVED from the budget; a
+      # V8 ceiling that disagrees means a worker can OOM while holding live
+      # WhatsApp sessions. If you change WORKER_HEAP_BUDGET_MB in the env file,
+      # change this number and mem_limit below in the same commit.
+      NODE_OPTIONS: '--max-old-space-size=${WORKER_HEAP_BUDGET_MB:-3072}'
+    # mem_limit = heap budget + non-heap process overhead (sockets, buffers,
+    # native modules). Do not set it equal to the heap budget.
+    mem_limit: 3584m
+    stop_grace_period: 45s
+
+  # The staff/admin API. A SEPARATE process from `api`, with its own config
+  # block (ADMIN_*) and its own auth (staff argon2id + mandatory TOTP + an IP
+  # allow-list). It is built into the SAME image, so it needs no separate
+  # build - only a different command.
+  #
+  # It refuses to boot in production without ADMIN_JWT_SECRET,
+  # INTERNAL_API_SERVICE_TOKEN_SECRET, WP_KEY_RING_PATH, LEADS_IP_HASH_SECRET
+  # and LEADS_ALLOWED_ORIGINS (admin/backend/src/platform/config.ts) - all five
+  # are in wp.env.example.
+  #
+  # ADMIN_IP_ALLOWED_CIDRS defaults to '' which DENIES every caller, so the
+  # panel is unreachable until you set it. That is deliberate (fail-closed);
+  # LAUNCH-CHECKLIST row 25 covers it.
+  admin-api:
+    <<: *backend
+    environment:
+      # No ROLE: this is not app/backend's role dispatcher.
+      ADMIN_HOST: 0.0.0.0
+    working_dir: /repo/admin/backend
+    command: ['node', 'dist/index.js']
+    ports:
+      - '127.0.0.1:${ADMIN_PORT:-3001}:3001'
+    # 1 GB box sizing pass: smaller surface than `api` (staff-only traffic,
+    # no SSE, no

@@ -1,0 +1,11 @@
+groups:
+  - name: fixture-bad-severity
+    rules:
+      - alert: BadSeverity
+        expr: wp_instances_unowned > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: 'fixture: invalid severity'
+          description: 'fixture only - never a real alert'
+          runbook_url: docs/RUNBOOK.md#alert-instances-unowned

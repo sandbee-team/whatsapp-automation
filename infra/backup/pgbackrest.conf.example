@@ -1,0 +1,32 @@
+# infra/backup/pgbackrest.conf.example (P29a Unit U3, step 9)
+#
+# EXAMPLE ONLY - not deployed by any script here. Names a Backblaze B2
+# off-site repository BY NAME only (no real endpoint/keys in this repo).
+# Copy to /etc/pgbackrest/pgbackrest.conf on the production Postgres host
+# and fill in the real repo1-* credentials via the deployment secret store,
+# never by editing this file in place with real values.
+#
+# repo1-cipher-pass is read from /etc/wp/secrets/pgbackrest-repo-pass - a
+# DIFFERENT secret from the key-ring passphrase (see
+# docs/runbooks/key-ring-restore.md). Losing one must never lose the other.
+
+[global]
+repo1-type=s3
+repo1-s3-endpoint=s3.us-west-002.backblazeb2.com
+repo1-s3-region=us-west-002
+repo1-s3-bucket=wp-postgres-backups
+repo1-path=/pgbackrest
+repo1-cipher-type=aes-256-cbc
+repo1-cipher-pass=<read from /etc/wp/secrets/pgbackrest-repo-pass, never inline>
+repo1-retention-full=4
+archive-async=y
+process-max=2
+log-level-console=info
+
+[wp]
+pg1-path=/var/lib/postgresql/17/main
+
+# --- Postgres-side settings (postgresql.conf, NOT this file) ---
+# archive_mode = on
+# archive_command = 'pgbackrest --stanza=wp archive-push %p'
+# archive_timeout = 60          # bounds RPO to <= 60s, well under the 5-min target

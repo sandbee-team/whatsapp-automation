@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "description": "P26 realistic multi-tenant mix (ADR 0018 §7 shape): three weighted steady-state classes (heavy/medium/small) plus one burst tenant. Field meanings are documented in scripts/loadtest/tenant-mix.ts (JSON cannot carry comments) - do not hand-edit the numbers without reading that file's header first.",
+  "tenants": [
+    { "key": "heavy", "weight": 1, "instances": 20, "sendsPerDayPerInstance": 600 },
+    { "key": "medium", "weight": 8, "instances": 5, "sendsPerDayPerInstance": 300 },
+    { "key": "small", "weight": 40, "instances": 1, "sendsPerDayPerInstance": 120 }
+  ],
+  "burstTenant": {
+    "key": "burst",
+    "instances": 2,
+    "recipients": 100000,
+    "startAtSeconds": 1800
+  }
+}

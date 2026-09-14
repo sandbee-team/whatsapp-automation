@@ -1,0 +1,52 @@
+{
+  "font": {
+    "ui": {
+      "$value": ["Instrument Sans", "Geist", "Noto Sans Devanagari", "system-ui", "sans-serif"],
+      "$type": "fontFamily"
+    },
+    "mono": {
+      "$value": ["Geist Mono", "ui-monospace", "SFMono-Regular", "monospace"],
+      "$type": "fontFamily"
+    }
+  },
+  "text": {
+    "xs": {
+      "size": { "$value": "12px", "$type": "dimension" },
+      "lineHeight": { "$value": "16px", "$type": "dimension" }
+    },
+    "sm": {
+      "size": { "$value": "13px", "$type": "dimension" },
+      "lineHeight": { "$value": "20px", "$type": "dimension" }
+    },
+    "base": {
+      "size": { "$value": "14px", "$type": "dimension" },
+      "lineHeight": { "$value": "20px", "$type": "dimension" }
+    },
+    "lg": {
+      "size": { "$value": "16px", "$type": "dimension" },
+      "lineHeight": { "$value": "24px", "$type": "dimension" }
+    },
+    "xl": {
+      "size": { "$value": "18px", "$type": "dimension" },
+      "lineHeight": { "$value": "26px", "$type": "dimension" }
+    },
+    "2xl": {
+      "size": { "$value": "22px", "$type": "dimension" },
+      "lineHeight": { "$value": "28px", "$type": "dimension" }
+    },
+    "3xl": {
+      "size": { "$value": "28px", "$type": "dimension" },
+      "lineHeight": { "$value": "34px", "$type": "dimension" }
+    },
+    "4xl": {
+      "size": { "$value": "34px", "$type": "dimension" },
+      "lineHeight": { "$value": "40px", "$type": "dimension" }
+    }
+  },
+  "fontWeight": {
+    "regular": { "$value": "400", "$type": "fontWeight" },
+    "medium": { "$value": "500", "$type": "fontWeight" },
+    "semibold": { "$value": "600", "$type": "fontWeight" },
+    "bold": { "$value": "700", "$type": "fontWeight" }
+  }
+}

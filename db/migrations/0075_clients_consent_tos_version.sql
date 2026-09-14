@@ -1,0 +1,26 @@
+-- P29a (launch-hardening-and-drills) step 10, Unit U4a - migration 0075.
+-- Records the ToS version a workspace accepted when its owner completes the
+-- onboarding consent step (`onboarding.service.ts#setConsent`). Migration
+-- 0013 already added `clients.consent_attested_at`/
+-- `consent_attested_by_user_id`, but no column held WHICH version of the
+-- terms was attested to - the version string is the ToS's own date
+-- (`packages/domain/src/copy/tos-version.ts#TOS_VERSION`, the date printed
+-- at the top of `website/content/legal/terms.mdx` §12).
+--
+-- Nullable: pre-existing workspaces attested consent before versions were
+-- recorded, so backfilling a value would be a guess, not a fact - core
+-- invariant 3's "idempotency/invariants at the storage layer" extended to
+-- "never fabricate historical data". The CHECK still keeps the storage layer
+-- honest for every value that IS written from here on: exactly the
+-- `YYYY-MM-DD` shape `TOS_VERSION_PATTERN` enforces in application code,
+-- enforced again at the database so an app bug cannot persist a malformed
+-- version.
+--
+-- Grants: `wp_app` already holds a TABLE-LEVEL UPDATE grant on `clients`
+-- (migration 0005/0008-era baseline - see `db/schema/grants.snapshot.json`,
+-- unlike the COLUMN-scoped grants added by migrations 0068/0072 for tables
+-- where `wp_app` needed only one column). A table-level grant automatically
+-- covers every column added afterward, so no additional GRANT statement is
+-- needed here.
+ALTER TABLE clients
+  ADD COLUMN consent_tos_version text CHECK (consent_tos_version ~ '^\d{4}-\d{2}-\d{2}$');

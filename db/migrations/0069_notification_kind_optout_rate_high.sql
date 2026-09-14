@@ -1,0 +1,18 @@
+-- P25 observability-and-runbook Unit U3 - migration 0069. Extends the
+-- existing `notification_kind` enum (migration 0048) with
+-- `optout_rate_high` (a client's trailing-24h opt-out rate crossed 10 per
+-- 1,000 acked sends, over a minimum sample size - see
+-- `modules/inbound/optout-rate-check.ts`'s own header). This is the ONE
+-- genuinely per-client check the blueprint names, implemented as a Postgres
+-- check that notify()s the tenant rather than a Prometheus series (a
+-- client_id label is forbidden by the four-gauge rule, ADR 0018/0019). See
+-- `packages/domain/src/enums/index.ts`'s `NOTIFICATION_KINDS` (appended,
+-- same order) and `packages/domain/src/notifications/kinds.ts`'s
+-- `NOTIFICATION_KIND_REGISTRY` for the severity/channel/dedupe-scope entry
+-- `db/tests/enum-parity.test.ts` requires to already agree.
+--
+-- Nothing but the one ADD VALUE statement - same reasoning as migrations
+-- 0059/0067: `ALTER TYPE ... ADD VALUE` cannot be used in the same
+-- transaction as a statement that reads the new value (PG12+), so this file
+-- stays minimal by design (no companion CREATE/ALTER of any other object).
+ALTER TYPE notification_kind ADD VALUE 'optout_rate_high';

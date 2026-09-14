@@ -1,0 +1,36 @@
+{
+  "name": "website",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/app/layout.tsx",
+  "scripts": {
+    "dev": "next dev --webpack -p 3002",
+    "build": "next build --webpack",
+    "test:perf": "vitest run --config vitest.perf.config.ts",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "next": "16.3.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "gsap": "3.15.0",
+    "next-mdx-remote": "6.0.0",
+    "gray-matter": "4.0.3",
+    "remark-gfm": "4.0.1",
+    "@wp/ui": "workspace:*",
+    "@wp/design-tokens": "workspace:*",
+    "@wp/domain": "workspace:*",
+    "@wp/utils": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "chrome-launcher": "1.2.1",
+    "lighthouse": "13.4.1",
+    "tailwindcss": "^4.3.3",
+    "@tailwindcss/postcss": "^4.3.3",
+    "vitest": "^4.1.11"
+  }
+}

@@ -1,0 +1,36 @@
+/*
+ * tailwind.css (P28 Unit U6, step 9) - Tailwind v4 CSS-first entry point for
+ * admin/frontend, mirrors app/frontend/src/styles/tailwind.css. `@source`
+ * points Tailwind v4's content scanner at `@wp/ui`'s source so its
+ * `bg-accent`/`text-fg`/... utility classes are generated even though this
+ * app never imports those literal strings itself.
+ */
+@import 'tailwindcss';
+@import '@wp/design-tokens/tokens.css';
+@import '@wp/design-tokens/tailwind.css';
+@source '../../../../packages/ui/src';
+
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: var(--font-ui);
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+}
+
+::selection {
+  background-color: var(--color-accent-soft);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}

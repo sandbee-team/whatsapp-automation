@@ -1,0 +1,14 @@
+-- P16 fix round (WARNING 5) - migration 0047.
+-- Forward-only, additive-only. Closes the gap the fix round reported:
+-- `HealthEvaluator.ts` reads `instance_pacing_state.last_band_improved_at`
+-- (health-evaluator-reads.ts's own PacingStateRow) but no migration ever
+-- granted wp_scheduler UPDATE on it, and no writer set it - migration 0045's
+-- own UPDATE list (the union of every P16 write path's touched columns)
+-- omitted it because no writer existed yet at the time.
+--
+-- `HealthEvaluator.ts#writeBookkeeping` now sets this column on the
+-- LOOSENING path only (denormalized display data - the anti-flap budget
+-- authority stays `pacing_events` BAND_CHANGE rows, read via
+-- `recentBandChanges`, never this column). Same wp_scheduler login role as
+-- every other P16 health write path (migration 0045's own header).
+GRANT UPDATE (last_band_improved_at) ON instance_pacing_state TO wp_scheduler;

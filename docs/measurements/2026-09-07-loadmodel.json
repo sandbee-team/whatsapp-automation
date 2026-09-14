@@ -1,0 +1,193 @@
+{
+  "schemaVersion": 1,
+  "kind": "load-model",
+  "capturedAtIso": "2026-09-07T14:26:34.673Z",
+  "hardware": {
+    "cpuModel": "12th Gen Intel(R) Core(TM) i5-12500",
+    "cpuCount": 12,
+    "totalMemBytes": 16608604160,
+    "kernel": "6.6.87.2-microsoft-standard-WSL2",
+    "cgroupVersion": 2
+  },
+  "node": "v24.20.0",
+  "viaPgBouncer": true,
+  "window": {
+    "startMs": 1788789996651,
+    "endMs": 1788791194636,
+    "seconds": 1197.985
+  },
+  "sends": {
+    "attempted": 30000,
+    "observed": 30000
+  },
+  "deltas": {
+    "statements": 2528046,
+    "relationSizeBytes": 40263680,
+    "walBytes": 439378000,
+    "perTableBytes": {
+      "message_job_refs": 1728512,
+      "message_wa_ids": 4104192,
+      "pacing_profiles": 0,
+      "plan_limits": 0,
+      "pacing_warmup_tiers": 0,
+      "opt_outs": 0,
+      "delivery_event_ids": 8511488,
+      "optout_confirmations": 0,
+      "notifications": 0,
+      "pacing_ledger": 540672,
+      "users": 0,
+      "content_fingerprints": 0,
+      "outbox_events": 0,
+      "client_daily_usage": 0,
+      "mfa_recovery_codes": 0,
+      "auth_sessions": 0,
+      "email_verification_tokens": 0,
+      "webhook_endpoints": 0,
+      "content_fingerprint_recipients": 0,
+      "pacing_events": 0,
+      "wallet_ledger_y2026m08": 0,
+      "clients": 0,
+      "memberships": 0,
+      "client_pricing": 0,
+      "instance_pacing_overrides": 0,
+      "recipient_send_buckets": 0,
+      "message_jobs": 0,
+      "wallet_ledger_ext_refs": 0,
+      "price_lists": 0,
+      "price_list_items": 0,
+      "schema_migrations": 0,
+      "wallet_ledger": 0,
+      "plans": 0,
+      "wallet_accounts": 0,
+      "whatsapp_session_credentials": 0,
+      "client_limit_overrides": 0,
+      "send_attempts": 7200768,
+      "tenant_optout_keywords": 0,
+      "password_reset_tokens": 0,
+      "webhook_deliveries": 0,
+      "tenant_blocked_words": 0,
+      "inbound_dead_letters": 0,
+      "whatsapp_session_keys": 0,
+      "contacts": 0,
+      "audit_logs_y2026m08": 0,
+      "instance_recipient_contacts": 0,
+      "contact_tags": 0,
+      "campaigns": 0,
+      "delivery_events_y2026w35": 0,
+      "delivery_events": 0,
+      "wa_groups": 0,
+      "delivery_events_y2026w36": 0,
+      "contact_tag_links": 0,
+      "whatsapp_instances": 0,
+      "audit_logs": 0,
+      "wallet_charge_guards_y2026m08": 0,
+      "instance_lease_state": 172032,
+      "wallet_charge_guards": 0,
+      "contact_imports": 0,
+      "wallet_daily_summary": 0,
+      "wallet_charge_guards_y2026m11": 0,
+      "audit_logs_y2026m09": 0,
+      "wallet_charge_guards_y2026m10": 0,
+      "contact_import_errors": 0,
+      "audit_logs_y2032m01": 0,
+      "campaign_recipients": 0,
+      "wallet_reconcile_findings": 0,
+      "consent_records": 0,
+      "wallet_charge_guards_y2026m09": 2465792,
+      "campaign_counters": 0,
+      "audit_logs_y2026m10": 0,
+      "audit_logs_y2032m07": 0,
+      "audit_logs_y2032m08": 0,
+      "message_jobs_y2026m10": 0,
+      "audit_logs_y2032m02": 0,
+      "wallet_ledger_y2026m10": 0,
+      "audit_logs_y2026m11": 0,
+      "message_jobs_y2026m08": 0,
+      "wallet_charge_guards_y2032m03": 0,
+      "message_jobs_y2026m09": 8192,
+      "message_jobs_y2026m11": 0,
+      "unresolved_action_keys": 0,
+      "delivery_events_y2026w37": 10510336,
+      "wallet_charge_guards_y2032m02": 0,
+      "instance_health_samples": 0,
+      "instance_pacing_state": 0,
+      "audit_logs_y2032m03": 0,
+      "wallet_charge_guards_y2032m01": 0,
+      "delivery_events_y2026w38": 0,
+      "topup_requests": 0,
+      "staff_audit_log": 0,
+      "wallet_charge_guards_y2032m07": 0,
+      "wallet_charge_guards_y2032m08": 0,
+      "wallet_ledger_y2026m11": 0,
+      "wallet_ledger_y2026m09": 5021696,
+      "delivery_events_y2026w39": 0,
+      "wallet_charge_guards_y2032m06": 0,
+      "audit_logs_y2032m06": 0
+    },
+    "baselineSubtracted": {
+      "statements": -3304138.1255452326,
+      "relationSizeBytes": 40263680,
+      "walBytes": 395415903.4954883
+    }
+  },
+  "baseline": {
+    "statementsPerSec": 4868.328172343755,
+    "walBytesPerSec": 36696.70029634069,
+    "relationBytesPerSec": 0,
+    "seconds": 60.066
+  },
+  "concurrentNote": "none declared",
+  "jobStatusHistogram": {
+    "sent": 30000
+  },
+  "drain": {
+    "complete": true,
+    "pendingAtEnd": 0,
+    "pendingSample": []
+  },
+  "measured": {
+    "statementsPerSend": 84.2682,
+    "bytesPerSend": 1342.1226666666666,
+    "walMbPerSec": 0.349773589647571,
+    "sendsPerSecond": 25.042049775247605,
+    "sampleSize": {
+      "sendCount": 30000,
+      "windowSeconds": 1197.985
+    }
+  },
+  "projected": [
+    {
+      "connected": 1000,
+      "sendsPerDayPerInstance": 168.9,
+      "bytesPerDay": 226684518.4,
+      "gbPerDay": 0.21111640930175782
+    },
+    {
+      "connected": 2000,
+      "sendsPerDayPerInstance": 168.9,
+      "bytesPerDay": 453369036.8,
+      "gbPerDay": 0.42223281860351564
+    },
+    {
+      "connected": 10000,
+      "sendsPerDayPerInstance": 168.9,
+      "bytesPerDay": 2266845184,
+      "gbPerDay": 2.111164093017578
+    }
+  ],
+  "derivedComparison": {
+    "statementsPerSendDerived": 12,
+    "bytesPerSendDerived": 3276.8,
+    "sendsPerDayDerived": 600,
+    "agreement": "measured 84.27 statements/send vs ADR 0018 section 7's derived 12; measured 1342.12 bytes/send vs derived 3276.8"
+  },
+  "notes": [
+    "measurement condition: eff_hourly_cap=200 and eff_daily_cap=600 were seeded on this run's own probe instances so 30 sends/instance can drain - RUN CONDITIONS, not tenant settings (scale-fleet-seed defaults are 60/600).",
+    "drain arithmetic: ceil(30000/1000) x max(ABSOLUTE_GAP_MIN_MS 15000ms, SCALE_FLEET_SAFETY_POLL_MS) = 900s expected drain floor (one claim per trigger; no next_eligible_at nudge - P26 run log #17).",
+    "window excludes fleet stand-up: pg_stat_statements_reset() and the BEFORE snapshot are taken after fleet.start() and after the pacing-cap UPDATE.",
+    "projection uses 168.9 sends/day/instance from scripts/loadtest/tenant-mix.json (weighted mean over the expanded mix) - a tenant-behaviour INPUT, not something this synthetic run measures.",
+    "preflight: 0 orphan send_attempts rows inside the id budget (seq 10444867, budget 62000)",
+    "reaper/reconciler sweeps ran on production cadence during the drive window: reaperRepairs=0, reconcilerResolved=0, reconcilerBlocked=0.",
+    "concurrent load during this run: none declared"
+  ]
+}

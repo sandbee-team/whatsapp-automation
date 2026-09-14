@@ -1,0 +1,26 @@
+{
+  // tsconfig.build.json (2026-09-14) - the PRODUCTION build of admin/backend,
+  // used only by the Docker image. Same reasoning as
+  // `app/backend/tsconfig.build.json`: the image's `.dockerignore` excludes the
+  // test tree, so the production compile must exclude the files that import it.
+  //
+  // `composite: false` + `incremental: false`: a leaf build for one image
+  // layer, never a referenced project, and it must not share a .tsbuildinfo
+  // with tsconfig.json.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "incremental": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "tsBuildInfoFile": null
+  },
+  "include": ["src"],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**",
+    "src/**/__test-support__/**"
+  ]
+}

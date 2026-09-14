@@ -1,0 +1,20 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/config" },
+    { "path": "packages/design-tokens" },
+    { "path": "packages/i18n" },
+    { "path": "packages/utils" },
+    { "path": "packages/domain" },
+    { "path": "packages/contracts" },
+    { "path": "db" },
+    { "path": "packages/server-kit" },
+    { "path": "packages/ui" },
+    { "path": "packages/testkit" },
+    { "path": "app/backend" },
+    { "path": "app/frontend" },
+    { "path": "admin/backend" },
+    { "path": "admin/frontend" },
+    { "path": "website" }
+  ]
+}

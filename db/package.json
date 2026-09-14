@@ -1,0 +1,38 @@
+{
+  "name": "@wp/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "wp-source": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./pool": {
+      "types": "./dist/pool.d.ts",
+      "wp-source": "./src/pool.ts",
+      "default": "./dist/pool.js"
+    },
+    "./migrate": {
+      "types": "./dist/migrate.d.ts",
+      "wp-source": "./src/migrate.ts",
+      "default": "./dist/migrate.js"
+    }
+  },
+  "scripts": {
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@wp/domain": "workspace:*",
+    "@wp/utils": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10",
+    "vitest": "^4.1.11"
+  }
+}

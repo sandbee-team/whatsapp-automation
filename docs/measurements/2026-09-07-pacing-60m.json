@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "kind": "pacing-run",
+  "capturedAtIso": "2026-09-07T13:59:25.194Z",
+  "hardware": {
+    "cpuModel": "12th Gen Intel(R) Core(TM) i5-12500",
+    "cpuCount": 12,
+    "totalMemBytes": 16608604160,
+    "kernel": "6.6.87.2-microsoft-standard-WSL2",
+    "cgroupVersion": 0
+  },
+  "node": "v24.20.0",
+  "run": {
+    "plannedSeconds": 3600,
+    "measuredSeconds": 3666.695,
+    "standUpSeconds": 258.442,
+    "instances": 1000,
+    "workers": 10,
+    "tenants": 3
+  },
+  "connection": {
+    "viaPgBouncer": true,
+    "poolMode": "transaction",
+    "label": "THROUGH-PGBOUNCER"
+  },
+  "reserveLatency": {
+    "samples": 7234,
+    "p50Ms": 6,
+    "p95Ms": 9,
+    "p99Ms": 35,
+    "maxMs": 166,
+    "sloMs": 25
+  },
+  "capViolations": [],
+  "jobs": {
+    "enqueued": 106540,
+    "sent": 6417,
+    "stillQueued": 100123,
+    "terminalFailed": 0,
+    "blockedNeedsReview": 0,
+    "cancelled": 0,
+    "driverEnqueued": 206540,
+    "ledgerRowCount": 1000,
+    "duplicateWaIds": 0
+  },
+  "burst": {
+    "recipients": 100000,
+    "startedAtMs": 1800000,
+    "otherTenantsClaimP99BeforeMs": 12,
+    "otherTenantsClaimP99DuringMs": 6,
+    "samplesBefore": 3586,
+    "samplesDuring": 3721,
+    "fairness": {
+      "ok": true,
+      "ratio": 0.5
+    }
+  },
+  "orphanReservations": {
+    "measurable": false,
+    "reason": "wp_pacing_orphan_reservations_total does not exist in v1 (P25, RUNBOOK.md#deferred-alerts)"
+  },
+  "notes": [
+    "eff_daily_cap set to 25 by UPDATE on the fleet's own assigned instances (derived from the heaviest tenant class's 600 sends/day over this run's 60-minute duration) - sized so the run genuinely approaches the cap, never a vacuous \"nothing to check\" result.",
+    "reaper/reconciler sweeps ran on production cadence during the drive window: reaperRepairs=0, reconcilerResolved=0, reconcilerBlocked=0."
+  ],
+  "verdict": "FAIL",
+  "problems": [
+    "reserveLatency.p99Ms (35) >= SLO 25ms",
+    "job conservation broken: driverEnqueued (206540) != sent+stillQueued+terminalFailed+blockedNeedsReview+cancelled (106540)"
+  ]
+}

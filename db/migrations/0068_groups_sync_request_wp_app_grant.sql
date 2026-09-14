@@ -1,0 +1,21 @@
+-- P24 (groups-messaging) Unit U3b - migration 0068.
+--
+-- Decision (orchestrator, 2026-09-06): `whatsapp_instances.groups_sync_requested_at`
+-- is written by a TENANT ACTION (`POST /v1/instances/:id/groups/sync`, audited),
+-- exactly like `desired_state` - migration 0023 grants `wp_app` UPDATE on that
+-- column directly (`db/queries/instance-set-desired-state.sql` is the
+-- precedent), and migration 0063's `GRANT UPDATE (replayed_at)` is the
+-- column-scoped-UPDATE idiom this migration mirrors. Migration 0066 granted
+-- `wp_app` SELECT-only on all three `groups_*` sync-clock columns, which made
+-- the sync-request API route unimplementable (the API can request a sync but
+-- had no grant to record the request timestamp).
+--
+-- Fix: grant `wp_app` a column-scoped UPDATE on `groups_sync_requested_at`
+-- ONLY. `groups_next_sync_after` and `groups_last_synced_at` remain
+-- worker-owned (`wp_scheduler` UPDATE only, unchanged from migration 0066) -
+-- the API can never move the hour clock forward or backward. The rate-limit
+-- predicate that reads `groups_next_sync_after` in its WHERE clause is
+-- unaffected: it only needs SELECT, which migration 0066 already grants
+-- `wp_app` on all three columns and this migration does not touch.
+
+GRANT UPDATE (groups_sync_requested_at) ON whatsapp_instances TO wp_app;

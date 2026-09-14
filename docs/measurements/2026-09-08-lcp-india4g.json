@@ -1,0 +1,88 @@
+{
+  "measuredAt": "2026-09-14T15:39:14.847Z",
+  "profile": {
+    "name": "india-4g-mid-tier-mobile",
+    "rttMs": 150,
+    "throughputKbps": 1600,
+    "uploadThroughputKbps": 750,
+    "cpuSlowdownMultiplier": 4,
+    "formFactor": "mobile",
+    "screenEmulation": {
+      "mobile": true,
+      "width": 412,
+      "height": 823,
+      "deviceScaleFactor": 1.75,
+      "disabled": false
+    },
+    "lighthouseThrottling": {
+      "rttMs": 150,
+      "throughputKbps": 1600,
+      "requestLatencyMs": 562.5,
+      "downloadThroughputKbps": 1440,
+      "uploadThroughputKbps": 675,
+      "cpuSlowdownMultiplier": 4
+    }
+  },
+  "budgetMs": 2500,
+  "results": [
+    {
+      "url": "http://127.0.0.1:3907/",
+      "lcpMs": 943.0063,
+      "fcpMs": 793.0063,
+      "tbtMs": 59,
+      "speedIndexMs": 793.0063,
+      "performanceScore": 100,
+      "lighthouseVersion": "13.4.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36",
+      "fetchTime": "2026-09-14T15:38:57.041Z",
+      "compression": {
+        "transferBytes": 200212,
+        "resourceBytes": 680056,
+        "compressedJsChunkFound": true
+      }
+    },
+    {
+      "url": "http://127.0.0.1:3907/pricing/",
+      "lcpMs": 1506.5095,
+      "fcpMs": 756.5094999999999,
+      "tbtMs": 69,
+      "speedIndexMs": 756.5094999999999,
+      "performanceScore": 100,
+      "lighthouseVersion": "13.4.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36",
+      "fetchTime": "2026-09-14T15:39:03.627Z",
+      "compression": {
+        "transferBytes": 184733,
+        "resourceBytes": 647849,
+        "compressedJsChunkFound": true
+      }
+    },
+    {
+      "url": "http://127.0.0.1:3907/docs/how-sending-is-paced/",
+      "lcpMs": 1505.8605000000002,
+      "fcpMs": 755.8605,
+      "tbtMs": 59,
+      "speedIndexMs": 755.8605,
+      "performanceScore": 100,
+      "lighthouseVersion": "13.4.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36",
+      "fetchTime": "2026-09-14T15:39:09.605Z",
+      "compression": {
+        "transferBytes": 169088,
+        "resourceBytes": 597158,
+        "compressedJsChunkFound": true
+      }
+    }
+  ],
+  "criticalPath": {
+    "initialChunksScanned": 8,
+    "gsapInInitial": false,
+    "lazyGsapChunk": "_next\\static\\chunks\\180.d3e715a301c84a34.js"
+  },
+  "heroIsland": {
+    "islandOffLcpMs": 1508.9,
+    "islandOnLcpMs": 943.0063,
+    "kept": true
+  },
+  "verdict": "PASS"
+}

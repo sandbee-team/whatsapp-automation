@@ -1,0 +1,306 @@
+# wp-alerts.rules.yml (P25 Unit U4, step 6) - the 23 alert rules. Every rule
+# carries labels.severity (page|ticket), annotations.summary,
+# annotations.description (plain prose, ids-only - never a templated
+# client_id/instance_id/phone/JID/body/external_ref; {{ $labels.role }} and
+# {{ $labels.instance }} are fine), and annotations.runbook_url pointing at
+# an existing `## alert-*` H2 anchor in docs/RUNBOOK.md. StrandedEpochJobs
+# (12) replaces the P23 stub (infra/observability/alerts/wp-broadcast.rules.yml,
+# deleted this unit) - same expression, folded into this one file so every
+# alert lives in one place and is scraped by check-alert-rules.ts uniformly.
+groups:
+  - name: wp-alerts
+    rules:
+      - alert: HardSignalPause
+        expr: sum(increase(wp_hard_signal_pauses_total[10m])) > 0
+        labels:
+          severity: page
+        annotations:
+          summary: 'A hard provider signal paused an instance'
+          description: >-
+            A restriction or hard signal paused at least one instance in the
+            last 10 minutes. Sending stopped for that instance and every
+            queued job for it is preserved. See the runbook before taking
+            any action.
+          runbook_url: docs/RUNBOOK.md#alert-hard-signal-pause
+
+      - alert: InstancesUnowned
+        expr: max(wp_instances_unowned) > 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: 'One or more desired-online instances have no live lease'
+          description: >-
+            A desired-online instance has had no live lease for more than 2
+            minutes. Queued jobs for it are preserved in Postgres. Takeover
+            is automatic once a worker has headroom.
+          runbook_url: docs/RUNBOOK.md#alert-instances-unowned
+
+      - alert: UnresolvedRateHigh
+        expr: wp:unresolved_rate_1d > 0.001
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'Unresolved send rate exceeds 0.1% over the trailing day'
+          description: >-
+            The share of sends whose outcome is unknown exceeded 0.1% of
+            sends over the trailing day. Most resolve automatically via echo
+            reconciliation; the remainder land in blocked_needs_review.
+          runbook_url: docs/RUNBOOK.md#alert-unresolved-rate-high
+
+      - alert: BandFlapsHigh
+        expr: sum(increase(wp_pacing_band_flaps_total[1d])) > 3
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'Health bands are oscillating for one or more instances'
+          description: >-
+            Health bands flapped more than 3 times over the trailing day.
+            This indicates the fleet thresholds are miscalibrated, not that
+            a tenant is misbehaving.
+          runbook_url: docs/RUNBOOK.md#alert-band-flaps-high
+
+      - alert: FleetHeadroomLow
+        expr: wp:fleet_headroom_ratio < 0.2
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'Fleet capacity headroom below 20%'
+          description: >-
+            Fleet-wide capacity headroom has been below 20% for 10 minutes.
+            Add a worker or box before headroom reaches zero.
+          runbook_url: docs/RUNBOOK.md#alert-fleet-headroom-low
+
+      - alert: FenceRegression
+        expr: sum(increase(wp_fence_regression_total[5m])) > 0
+        labels:
+          severity: page
+        annotations:
+          summary: 'Redis-vs-Postgres fence disagreement detected'
+          description: >-
+            A Redis-mirrored fence value fell behind the value Postgres
+            minted. This may indicate Redis was restored from an old
+            snapshot, or a bug.
+          runbook_url: docs/RUNBOOK.md#alert-fence-regression
+
+      - alert: WalletDrift
+        expr: sum(abs(wp_wallet_drift_minor)) > 0
+        labels:
+          severity: page
+        annotations:
+          summary: 'Wallet drift detected'
+          description: >-
+            A wallet balance drifted from its reconciled value, in either
+            direction. See the runbook for the reconciliation procedure.
+          runbook_url: docs/RUNBOOK.md#alert-wallet-drift
+
+      - alert: RedisSigMemoryHigh
+        expr: redis_memory_used_bytes{role="redis-sig"} / redis_memory_max_bytes{role="redis-sig"} > 0.75 and redis_memory_max_bytes{role="redis-sig"} > 0
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: 'redis-sig memory usage above 75% of maxmemory'
+          description: >-
+            redis-sig holds Signal session records under a noeviction
+            policy; at maxmemory, writes fail and the affected instance
+            degrades. Raise redis-sig maxmemory or add RAM.
+          runbook_url: docs/RUNBOOK.md#alert-redis-sig-memory-high
+
+      - alert: SignalDecryptEvicted
+        expr: sum(increase(wp_signal_decrypt_failure_total{cause="evicted"}[1h])) / clamp_min(sum(increase(wp_inbound_events_total[1h])), 1) > 0.005
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'Signal decrypt failures from eviction exceed 0.5% of inbound events'
+          description: >-
+            More than 0.5% of inbound events over the trailing hour failed
+            to decrypt because the Signal session record was evicted from
+            redis-sig. Confirm the noeviction policy and check working-set
+            size.
+          runbook_url: docs/RUNBOOK.md#alert-signal-decrypt-evicted
+
+      - alert: InboundShed
+        expr: sum(increase(wp_inbound_shed_total[10m])) > 0
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'Inbound admission shed messages'
+          description: >-
+            Inbound admission shed messages above the per-instance rate or
+            in-flight limit in the last 10 minutes. Outbound sending is
+            unaffected.
+          runbook_url: docs/RUNBOOK.md#alert-inbound-shed
+
+      - alert: BroadcastExpansionLag
+        expr: histogram_quantile(0.99, sum by (le) (rate(wp_broadcast_expansion_lag_seconds_bucket[15m]))) > 300
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'broadcast expansion p99 latency above 300 seconds'
+          description: >-
+            The p99 time to expand a broadcast into queued send jobs
+            exceeded 300 seconds over the trailing 15 minutes.
+          runbook_url: docs/RUNBOOK.md#alert-broadcast-expansion-lag
+
+      - alert: StrandedEpochJobs
+        expr: max(wp_stranded_epoch_jobs) > 0
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: 'Stranded epoch jobs detected'
+          description: >-
+            One or more message_jobs rows have been sitting in
+            blocked_needs_review with unresolved_reason =
+            session_epoch_advanced for at least 5 minutes. Nothing is lost
+            (invariant 5: pause preserves work) - a human must confirm a
+            restamp (POST /v1/broadcasts/:id/restamp) naming the exact
+            affected count, or cancel the affected broadcast. Never
+            auto-resolved.
+          runbook_url: docs/RUNBOOK.md#alert-stranded-epoch-jobs
+
+      - alert: ShedNoTaker
+        expr: sum(increase(wp_shed_no_taker_total[10m])) > 0
+        labels:
+          severity: page
+        annotations:
+          summary: 'A shed instance found no taker within two scan cycles'
+          description: >-
+            A worker shed an instance and no other worker re-grabbed it
+            within two scan cycles - the fleet is at capacity. The shed
+            instance state and queued jobs stay preserved.
+          runbook_url: docs/RUNBOOK.md#alert-shed-no-taker
+
+      - alert: MessagesOutWithoutJob
+        expr: max(wp_messages_out_without_job) > 0
+        labels:
+          severity: page
+        annotations:
+          summary: 'Outbound message with no matching durable job'
+          description: >-
+            Invariant 1 (durable-first) was violated - an outbound provider
+            message id exists with neither a matching message_jobs row nor
+            echo evidence. This is a code bug, not an operational condition.
+          runbook_url: docs/RUNBOOK.md#alert-messages-out-without-job
+
+      - alert: WorkerEventLoopLagHigh
+        expr: wp_worker_eventloop_lag_p99 > 200
+        for: 5m
+        labels:
+          severity: ticket
+          scope: worker
+        annotations:
+          summary: 'Worker event-loop p99 lag above 200ms'
+          description: >-
+            Event-loop p99 lag exceeded 200ms for 5 minutes on a
+            session-worker. Admission goes to holding once this threshold
+            is crossed for 3 consecutive samples.
+          runbook_url: docs/RUNBOOK.md#alert-worker-eventloop-lag-high
+
+      - alert: WorkerSessionsSaturated
+        expr: wp_worker_sessions >= wp_worker_session_cap and wp_worker_session_cap > 0
+        for: 10m
+        labels:
+          severity: ticket
+          scope: worker
+        annotations:
+          summary: 'A worker has reached its derived session cap'
+          description: >-
+            A session-worker has reached its derived session cap for 10
+            minutes. Add a worker; never raise the cap by hand - it is
+            derived from the heap budget and measured per-session
+            footprint.
+          runbook_url: docs/RUNBOOK.md#alert-worker-sessions-saturated
+
+      - alert: SessionRssAboveBracket
+        expr: wp_session_rss_bytes_est > 60 * 1024 * 1024
+        for: 30m
+        labels:
+          severity: ticket
+          scope: worker
+        annotations:
+          summary: 'Measured per-session RSS at or above the 60 MB bracket'
+          description: >-
+            Per ADR 0018, measured RSS at or above 60 MB per session changes
+            the shape of the 10k-session path. Capture a heap snapshot for
+            architecture review; never change caps by hand.
+          runbook_url: docs/RUNBOOK.md#alert-session-rss-above-bracket
+
+      - alert: ScrapeTargetDown
+        expr: up{job="wp"} == 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: 'A wp scrape target is down'
+          description: >-
+            Prometheus has failed to scrape a wp target for 2 minutes. This
+            inhibits the scope=worker alerts for the same instance so a
+            dead scrape target does not also fire a storm of worker alerts.
+          runbook_url: docs/RUNBOOK.md#alert-scrape-target-down
+
+      - alert: LeaseTakeoversHigh
+        expr: sum(increase(wp_lease_takeovers_total[1h])) > 3
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'More than 3 lease takeovers in the last hour'
+          description: >-
+            More than 3 takeovers per hour indicates flapping rather than
+            ordinary failover. Check for worker restarts and Redis latency.
+          runbook_url: docs/RUNBOOK.md#alert-lease-takeovers-high
+
+      - alert: OutboxBacklog
+        expr: max(wp_outbox_depth) > 10000
+        for: 5m
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'Outbox depth above 10000'
+          description: >-
+            The outbox has held more than 10000 unpublished events for 5
+            minutes. See the runbook for the drain procedure.
+          runbook_url: docs/RUNBOOK.md#alert-outbox-backlog
+
+      - alert: RelayStalled
+        expr: max(wp_outbox_depth) > 0 and sum(increase(wp_outbox_events_published_total[2m])) == 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: 'Outbox has depth but the relay has published nothing'
+          description: >-
+            The outbox holds unpublished events but no events were
+            published in the last 2 minutes. The relay process may be
+            stalled or down.
+          runbook_url: docs/RUNBOOK.md#alert-relay-stalled
+
+      - alert: InboundDeadLetters
+        expr: sum(increase(wp_inbound_dead_letters_total[1h])) > 0
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'Inbound dead letters recorded'
+          description: >-
+            Rows exist in inbound_dead_letters from the last hour, grouped
+            by error_class. An inbound handler throwing never affects
+            sending.
+          runbook_url: docs/RUNBOOK.md#alert-inbound-dead-letters
+
+      - alert: ReconcileAmbiguous
+        expr: sum(increase(wp_reconcile_ambiguous_total[1h])) > 0
+        labels:
+          severity: ticket
+        annotations:
+          summary: 'An unresolved send matched more than one echo candidate'
+          description: >-
+            An unresolved send matched more than one echo candidate in the
+            last hour - information about which echo belongs to which send
+            is being lost.
+          runbook_url: docs/RUNBOOK.md#alert-reconcile-ambiguous

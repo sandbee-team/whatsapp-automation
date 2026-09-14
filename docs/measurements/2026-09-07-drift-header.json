@@ -1,0 +1,31 @@
+{
+  "kind": "header",
+  "schemaVersion": 1,
+  "runKind": "drift",
+  "capturedAtIso": "2026-09-07T06:55:19.124Z",
+  "profile": "idle",
+  "sessions": 1000,
+  "plannedHours": 168,
+  "sampleIntervalMs": 3600000,
+  "hardware": {
+    "cpuModel": "12th Gen Intel(R) Core(TM) i5-12500",
+    "cpuCount": 12,
+    "totalMemBytes": 16608604160,
+    "kernel": "6.6.87.2-microsoft-standard-WSL2",
+    "cgroupVersion": 2
+  },
+  "node": "v24.20.0",
+  "baileysVersion": "7.0.0-rc14",
+  "banner": "SOCKET-RESIDENT-PRE-HANDSHAKE (component A): real Baileys sockets constructed through the real EncryptedAuthStore and bounded Signal key store, holding a live TLS/WS connection and the full socket object graph resident at the awaited-serverHello point of the real Noise XX handshake. The handshake does not and cannot complete against a local peer (no cert forgery - invariant 6). This measures section 1.1 rows 1,2,3,7,11,12. It does NOT measure the post-handshake transport (row-1 keepalive cadence, the noise transport cipher state), the initial app-state/query traffic, or any real Signal/group working set (rows 4,5,6,9 - component B, P10a). Not a per-session cost; the per-session number is A + B. No figure here may be quoted to a customer (ADR 0016, ADR 0018 section 8). · DRIFT (M6): fixed N held resident for the planned window, hourly samples, no forced GC (production-like), real-number cohort = 0 (founder open item 6) - the verdict is computed by driftVerdict over rows with full residency only; P26a reads this file.",
+  "isLinux": true,
+  "realNumberCohort": 0,
+  "forcedGc": false,
+  "notes": [
+    "M6 7-day drift run, P26 session 2026-09-07",
+    "Container: node:24, --memory 6g, --max-old-space-size=4096, network wp-dev_default",
+    "ulimit -n 1048576; ip_local_port_range 32768-60999; somaxconn 4096 (container defaults, unmodified)",
+    "Linux tsx loader from docker volume wp-linux-tsx (host node_modules esbuild binary is win32-only)",
+    "Concurrent P26 activity on the same VM: load-model, pacing and chaos runs - recorded as marks",
+    "Real-number cohort: 0 (founder open item 6) - synthetic sockets only, never dials WhatsApp"
+  ]
+}

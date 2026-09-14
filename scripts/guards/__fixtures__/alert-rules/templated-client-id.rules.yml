@@ -1,0 +1,11 @@
+groups:
+  - name: fixture-templated-client-id
+    rules:
+      - alert: TemplatedClientId
+        expr: wp_instances_unowned > 0
+        labels:
+          severity: page
+        annotations:
+          summary: 'fixture: templated client id'
+          description: 'client {{ $labels.client_id }} has an unowned instance'
+          runbook_url: docs/RUNBOOK.md#alert-instances-unowned

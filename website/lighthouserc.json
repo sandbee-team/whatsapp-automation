@@ -1,0 +1,17 @@
+{
+  "ci": {
+    "collect": {
+      "url": ["/", "/pricing/", "/docs/how-sending-is-paced/"],
+      "settings": {
+        "onlyCategories": ["performance"],
+        "throttlingMethod": "simulate",
+        "profile": "tests/perf/india-4g.json"
+      }
+    },
+    "assert": {
+      "assertions": {
+        "largest-contentful-paint": ["error", { "maxNumericValue": 2500 }]
+      }
+    }
+  }
+}

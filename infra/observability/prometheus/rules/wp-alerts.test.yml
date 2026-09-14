@@ -1,0 +1,117 @@
+# wp-alerts.test.yml (P25 Unit U4, step 6) - promtool unit tests for the
+# five representative cases the phase Dispatch plan names. This file's
+# extension is `.test.yml`, NOT `.rules.yml`, so Prometheus's own
+# `rule_files: ['/etc/prometheus/rules/*.rules.yml']` glob never loads it as
+# a live rule set - only `promtool test rules` reads it.
+rule_files:
+  - wp-alerts.rules.yml
+  - wp-slo.rules.yml
+
+evaluation_interval: 15s
+
+tests:
+  # case: wp_instances_unowned_fires_after_two_minutes
+  - interval: 15s
+    input_series:
+      - series: 'wp_instances_unowned{job="wp",role="session-worker",instance="host.docker.internal:9465"}'
+        values: '1x8'
+    alert_rule_test:
+      - eval_time: 90s
+        alertname: InstancesUnowned
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: InstancesUnowned
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: 'One or more desired-online instances have no live lease'
+              description: >-
+                A desired-online instance has had no live lease for more than 2
+                minutes. Queued jobs for it are preserved in Postgres. Takeover
+                is automatic once a worker has headroom.
+              runbook_url: docs/RUNBOOK.md#alert-instances-unowned
+
+  # case: any_fence_regression_pages_immediately
+  - interval: 15s
+    input_series:
+      - series: 'wp_fence_regression_total{job="wp",role="session-worker",instance="a"}'
+        values: '0 0 0 1 1 1'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: FenceRegression
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: 'Redis-vs-Postgres fence disagreement detected'
+              description: >-
+                A Redis-mirrored fence value fell behind the value Postgres
+                minted. This may indicate Redis was restored from an old
+                snapshot, or a bug.
+              runbook_url: docs/RUNBOOK.md#alert-fence-regression
+
+  # case: wallet_drift_nonzero_pages
+  - interval: 15s
+    input_series:
+      - series: 'wp_wallet_drift_minor{job="wp",role="cron",instance="c"}'
+        values: '-1x4'
+      - series: 'wp_wallet_drift_minor{job="wp",role="api",instance="a"}'
+        values: '0x4'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: WalletDrift
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: 'Wallet drift detected'
+              description: >-
+                A wallet balance drifted from its reconciled value, in either
+                direction. See the runbook for the reconciliation procedure.
+              runbook_url: docs/RUNBOOK.md#alert-wallet-drift
+
+  # case: headroom_ratio_below_twenty_percent_warns
+  - interval: 15s
+    input_series:
+      - series: 'wp_fleet_capacity_headroom{job="wp",role="session-worker",instance="a"}'
+        values: '10x50'
+      - series: 'wp_instances_desired_online{job="wp",role="session-worker",instance="a"}'
+        values: '90x50'
+    promql_expr_test:
+      - expr: wp:fleet_headroom_ratio
+        eval_time: 5m
+        exp_samples:
+          - labels: 'wp:fleet_headroom_ratio'
+            value: 0.1
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: FleetHeadroomLow
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: 'Fleet capacity headroom below 20%'
+              description: >-
+                Fleet-wide capacity headroom has been below 20% for 10 minutes.
+                Add a worker or box before headroom reaches zero.
+              runbook_url: docs/RUNBOOK.md#alert-fleet-headroom-low
+
+  # case: messages_out_without_job_pages
+  - interval: 15s
+    input_series:
+      - series: 'wp_messages_out_without_job{job="wp",role="cron",instance="c"}'
+        values: '0 0 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 1m15s
+        alertname: MessagesOutWithoutJob
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: 'Outbound message with no matching durable job'
+              description: >-
+                Invariant 1 (durable-first) was violated - an outbound provider
+                message id exists with neither a matching message_jobs row nor
+                echo evidence. This is a code bug, not an operational condition.
+              runbook_url: docs/RUNBOOK.md#alert-messages-out-without-job

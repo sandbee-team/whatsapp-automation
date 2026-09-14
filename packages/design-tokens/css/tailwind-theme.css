@@ -1,0 +1,146 @@
+/**
+ * GENERATED FILE - do not edit by hand. Run `pnpm tokens:build` to
+ * regenerate. Tailwind v4 CSS-first theme mapping (this file IS the
+ * "Tailwind preset") - import alongside css/tokens.css.
+ */
+@theme {
+  --color-bg: var(--wp-color-semantic-light-bg);
+  --color-surface: var(--wp-color-semantic-light-surface);
+  --color-surface-2: var(--wp-color-semantic-light-surface-2);
+  --color-surface-3: var(--wp-color-semantic-light-surface-3);
+  --color-fg: var(--wp-color-semantic-light-fg);
+  --color-muted: var(--wp-color-semantic-light-muted);
+  --color-subtle: var(--wp-color-semantic-light-subtle);
+  --color-border: var(--wp-color-semantic-light-border);
+  --color-border-strong: var(--wp-color-semantic-light-border-strong);
+  --color-ring: var(--wp-color-semantic-light-ring);
+  --color-accent: var(--wp-color-semantic-light-accent);
+  --color-accent-hover: var(--wp-color-semantic-light-accent-hover);
+  --color-accent-fg: var(--wp-color-semantic-light-accent-fg);
+  --color-accent-soft: var(--wp-color-semantic-light-accent-soft);
+  --color-success: var(--wp-color-semantic-light-success);
+  --color-success-soft: var(--wp-color-semantic-light-success-soft);
+  --color-warning: var(--wp-color-semantic-light-warning);
+  --color-warning-soft: var(--wp-color-semantic-light-warning-soft);
+  --color-danger: var(--wp-color-semantic-light-danger);
+  --color-danger-hover: var(--wp-color-semantic-light-danger-hover);
+  --color-danger-soft: var(--wp-color-semantic-light-danger-soft);
+  --color-info: var(--wp-color-semantic-light-info);
+  --color-info-soft: var(--wp-color-semantic-light-info-soft);
+  --color-sidebar: var(--wp-color-semantic-light-sidebar);
+  --color-sidebar-fg: var(--wp-color-semantic-light-sidebar-fg);
+  --color-sidebar-muted: var(--wp-color-semantic-light-sidebar-muted);
+  --color-sidebar-border: var(--wp-color-semantic-light-sidebar-border);
+  --color-sidebar-active: var(--wp-color-semantic-light-sidebar-active);
+  --color-sidebar-active-fg: var(--wp-color-semantic-light-sidebar-active-fg);
+  --color-overlay: var(--wp-color-semantic-light-overlay);
+  --color-chart-1: var(--wp-color-semantic-light-chart-1);
+  --color-chart-2: var(--wp-color-semantic-light-chart-2);
+  --color-chart-3: var(--wp-color-semantic-light-chart-3);
+  --color-chart-4: var(--wp-color-semantic-light-chart-4);
+  --color-chart-5: var(--wp-color-semantic-light-chart-5);
+  --font-ui: var(--wp-font-ui);
+  --font-mono: var(--wp-font-mono);
+  --ease-standard: var(--wp-motion-easing-standard);
+  --ease-decelerate: var(--wp-motion-easing-decelerate);
+  --ease-accelerate: var(--wp-motion-easing-accelerate);
+  --radius-none: var(--wp-radius-none);
+  --radius-sm: var(--wp-radius-sm);
+  --radius-md: var(--wp-radius-md);
+  --radius-lg: var(--wp-radius-lg);
+  --radius-xl: var(--wp-radius-xl);
+  --radius-full: var(--wp-radius-full);
+  --shadow-sm: var(--wp-shadow-sm);
+  --shadow-md: var(--wp-shadow-md);
+  --shadow-lg: var(--wp-shadow-lg);
+  --shadow-card: var(--wp-shadow-card);
+  --shadow-elevated: var(--wp-shadow-elevated);
+  --spacing-0: var(--wp-space-0);
+  --spacing-1: var(--wp-space-1);
+  --spacing-2: var(--wp-space-2);
+  --spacing-3: var(--wp-space-3);
+  --spacing-4: var(--wp-space-4);
+  --spacing-5: var(--wp-space-5);
+  --spacing-6: var(--wp-space-6);
+  --spacing-8: var(--wp-space-8);
+  --spacing-10: var(--wp-space-10);
+  --spacing-12: var(--wp-space-12);
+  --spacing-16: var(--wp-space-16);
+  --text-xs: var(--wp-text-xs-size);
+  --text-xs--line-height: var(--wp-text-xs-lineHeight);
+  --text-sm: var(--wp-text-sm-size);
+  --text-sm--line-height: var(--wp-text-sm-lineHeight);
+  --text-base: var(--wp-text-base-size);
+  --text-base--line-height: var(--wp-text-base-lineHeight);
+  --text-lg: var(--wp-text-lg-size);
+  --text-lg--line-height: var(--wp-text-lg-lineHeight);
+  --text-xl: var(--wp-text-xl-size);
+  --text-xl--line-height: var(--wp-text-xl-lineHeight);
+  --text-2xl: var(--wp-text-2xl-size);
+  --text-2xl--line-height: var(--wp-text-2xl-lineHeight);
+  --text-3xl: var(--wp-text-3xl-size);
+  --text-3xl--line-height: var(--wp-text-3xl-lineHeight);
+  --text-4xl: var(--wp-text-4xl-size);
+  --text-4xl--line-height: var(--wp-text-4xl-lineHeight);
+  --animate-fade-in: fade-in var(--wp-motion-duration-normal) var(--wp-motion-easing-standard);
+  --animate-fade-out: fade-out var(--wp-motion-duration-fast) var(--wp-motion-easing-standard);
+  --animate-scale-in: scale-in var(--wp-motion-duration-normal) var(--wp-motion-easing-decelerate);
+  --animate-slide-in-from-right: slide-in-from-right var(--wp-motion-duration-normal) var(--wp-motion-easing-decelerate);
+  --animate-slide-in-from-bottom: slide-in-from-bottom var(--wp-motion-duration-normal) var(--wp-motion-easing-decelerate);
+  --animate-shimmer: shimmer var(--wp-motion-duration-slow) var(--wp-motion-easing-standard);
+  --animate-rise-in: rise-in var(--wp-motion-duration-slower) var(--wp-motion-easing-decelerate) both;
+  --animate-pop-in: pop-in var(--wp-motion-duration-normal) var(--wp-motion-easing-decelerate) both;
+  --animate-float: float var(--wp-motion-duration-drift) var(--wp-motion-easing-standard) infinite;
+  --animate-aurora: aurora var(--wp-motion-duration-glacial) var(--wp-motion-easing-standard) infinite;
+  --animate-pulse-ring: pulse-ring var(--wp-motion-duration-pulse) var(--wp-motion-easing-decelerate) infinite;
+  --animate-draw: draw var(--wp-motion-duration-slower) var(--wp-motion-easing-decelerate) both;
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes slide-in-from-right {
+    from { transform: translateX(8px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes slide-in-from-bottom {
+    from { transform: translateY(8px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes shimmer {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+  }
+  @keyframes rise-in {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes pop-in {
+    from { opacity: 0; transform: scale(.92); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  @keyframes aurora {
+    0% { transform: translate3d(-4%, -2%, 0) rotate(0); }
+    50% { transform: translate3d(4%, 3%, 0) rotate(6deg); }
+    100% { transform: translate3d(-4%, -2%, 0) rotate(0); }
+  }
+  @keyframes pulse-ring {
+    0% { transform: scale(1); opacity: .6; }
+    100% { transform: scale(2.2); opacity: 0; }
+  }
+  @keyframes draw {
+    from { stroke-dashoffset: var(--wp-draw-length, 1000); }
+    to { stroke-dashoffset: 0; }
+  }
+}

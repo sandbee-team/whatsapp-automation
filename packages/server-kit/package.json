@@ -1,0 +1,58 @@
+{
+  "name": "@wp/server-kit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "wp-source": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./tenant": {
+      "types": "./dist/tenant/index.d.ts",
+      "wp-source": "./src/tenant/index.ts",
+      "default": "./dist/tenant/index.js"
+    },
+    "./config": {
+      "types": "./dist/config/index.d.ts",
+      "wp-source": "./src/config/index.ts",
+      "default": "./dist/config/index.js"
+    },
+    "./obs": {
+      "types": "./dist/obs/index.d.ts",
+      "wp-source": "./src/obs/index.ts",
+      "default": "./dist/obs/index.js"
+    },
+    "./errors": {
+      "types": "./dist/errors/index.d.ts",
+      "wp-source": "./src/errors/index.ts",
+      "default": "./dist/errors/index.js"
+    },
+    "./crypto": {
+      "types": "./dist/crypto/index.d.ts",
+      "wp-source": "./src/crypto/index.ts",
+      "default": "./dist/crypto/index.js"
+    },
+    "./auth": {
+      "types": "./dist/auth/index.d.ts",
+      "wp-source": "./src/auth/index.ts",
+      "default": "./dist/auth/index.js"
+    }
+  },
+  "dependencies": {
+    "@wp/db": "workspace:*",
+    "@wp/domain": "workspace:*",
+    "@wp/contracts": "workspace:*",
+    "@wp/utils": "workspace:*",
+    "zod": "^4.4.3",
+    "pino": "^10.3.1",
+    "prom-client": "^15.1.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.3.0",
+    "baileys": "7.0.0-rc14"
+  }
+}

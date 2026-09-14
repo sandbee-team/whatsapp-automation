@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "active": {
+    "session": "k2",
+    "tenant-secrets": "k3",
+    "user-secrets": "k4",
+    "optout-pepper": "k5",
+    "api-key-pepper": "k6"
+  },
+  "keys": {
+    "k1": {
+      "purpose": "session",
+      "material": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "retired": true
+    },
+    "k2": {
+      "purpose": "session",
+      "material": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+      "created_at": "2026-02-01T00:00:00.000Z"
+    },
+    "k3": {
+      "purpose": "tenant-secrets",
+      "material": "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=",
+      "created_at": "2026-02-01T00:00:00.000Z"
+    },
+    "k4": {
+      "purpose": "user-secrets",
+      "material": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=",
+      "created_at": "2026-02-01T00:00:00.000Z"
+    },
+    "k5": {
+      "purpose": "optout-pepper",
+      "material": "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU=",
+      "created_at": "2026-02-01T00:00:00.000Z"
+    },
+    "k6": {
+      "purpose": "api-key-pepper",
+      "material": "BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY=",
+      "created_at": "2026-02-01T00:00:00.000Z"
+    }
+  }
+}

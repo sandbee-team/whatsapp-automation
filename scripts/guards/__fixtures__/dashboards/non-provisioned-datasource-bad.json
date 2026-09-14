@@ -1,0 +1,29 @@
+{
+  "uid": "fixture-non-provisioned-datasource-bad",
+  "title": "Fixture: non-provisioned datasource",
+  "tags": ["wp"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Queue depth",
+      "description": "Fixture panel - should fail the guard (unknown datasource uid).",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "influxdb-not-provisioned" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(wp_queue_depth_total)"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    }
+  ]
+}

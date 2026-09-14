@@ -1,0 +1,19 @@
+---
+title: Why we do not promise deliverability
+description: What WP commits to, what it refuses to promise, and why paced sending is the product rather than a feature bolted on top of it.
+date: 2026-09-08
+---
+
+Most messaging tools promise speed. We think that promise is dishonest, so we don't make it.
+
+## What we promise
+
+WP stores every message as a durable job before anything is attempted, so a crash or a restart never loses queued work. It paces sending honestly, based on a number's warm-up tier and its real health signals. If WhatsApp signals a restriction, WP stops sending on that number, keeps the queue, and tells you — it does not guess, retry blindly, or quietly switch you to another number. And every message is metered per result, not per attempt, so you are never charged for something that never reached "sent".
+
+## What we refuse to promise
+
+We will not tell you a number cannot be restricted or banned. WhatsApp restrictions come from recipient reports, message content, and account reputation — none of which any sending tool, including ours, controls. A tool that claims otherwise is either wrong or hiding what it actually does. Pacing reduces one kind of risk — sending too fast or too cold — and nothing more.
+
+## Why the pacing is the product
+
+Once you accept that restrictions cannot be engineered away, the honest thing left to build is a system that paces sending carefully, watches signals continuously, and tells you the truth the moment something changes. That is what WP does, and it's the whole product — not a limitation around the edges of one.

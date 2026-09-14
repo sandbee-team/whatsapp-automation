@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "kind": "chaos-fleet-run",
+  "capturedAtIso": "2026-09-07T11:09:10.616Z",
+  "hardware": {
+    "cpuModel": "12th Gen Intel(R) Core(TM) i5-12500",
+    "cpuCount": 12,
+    "totalMemBytes": 34033348608,
+    "kernel": "10.0.26200",
+    "cgroupVersion": 0
+  },
+  "node": "v24.19.0",
+  "fleet": {
+    "instances": 300,
+    "workers": 6,
+    "sessionsPerWorker": 50,
+    "tenants": 6
+  },
+  "records": [
+    {
+      "schemaVersion": 1,
+      "kind": "chaos",
+      "scenario": "rolling-deploy",
+      "capturedAtIso": "2026-09-07T11:06:10.002Z",
+      "fleet": {
+        "instances": 300,
+        "workers": 6,
+        "sessionsPerWorker": 50
+      },
+      "measurements": {
+        "sendsObserved": 1381,
+        "waveSize": 1,
+        "waves": 6,
+        "drainExitCodesNonZero": 0,
+        "maxSimultaneouslyUnowned": 50,
+        "maxUnownedFraction": 0.1667,
+        "reQrCount": 0,
+        "jobsLost": 0,
+        "needsReconcileUnexplained": 0
+      },
+      "sloTargets": {
+        "sendsObserved": "> 0 (a run with zero send_attempts rows proves nothing about the send path)",
+        "waveSize": "<= 2% of fleet sessions per wave (SLO-derived, ADR 0018 S4)",
+        "drainExitCodesNonZero": "== 0 (every drain is graceful)",
+        "reQrCount": "== 0 (link_state stays linked, cred_version never regresses)",
+        "jobsLost": "== 0 (row-count identity)",
+        "needsReconcileUnexplained": "== 0 (resolved or blocked_needs_review)"
+      },
+      "verdict": "PASS",
+      "problems": [],
+      "notes": [
+        "reQrCount is storage-layer evidence (link_state + cred_version), not a QR-event count - the harness FakeSock never emits a real qr event."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+-- P13 correctness fix (post-close-review) - migration 0032.
+-- Forward-only, additive-only. No column dropped, no type changed, no data
+-- rewritten, no REVOKE anywhere in this file.
+--
+-- THE BUG: db/queries/claim-jobs.sql's RETURNING list was widened (same
+-- change set as this migration) to add `j.is_new_conversation`, so the
+-- claim statement returns the job's OWN stored cold-outreach classification
+-- and engine/queue/send-loop-pacing-claim.ts's claimAndReserve() can pass
+-- the REAL `$is_new_conversation` into db/queries/reserve-pacing.sql
+-- instead of a hardcoded `false`. Hardcoding `false` meant
+-- pacing_ledger.new_conv_count never incremented in production, which
+-- disables NEW_CONV_CAP (the blueprint's cold-outreach cap - unlimited
+-- cold first-messages per day) and the cold-ratio predicate outright -
+-- one of the three signals P16 actually scores (blueprint § Signal-driven
+-- health). That RETURNING-list widening is USELESS without this grant:
+-- message_jobs uses the narrow per-column grant model migration 0012
+-- introduced for wp_scheduler (the claim statement's role), and 0012's
+-- column list - by construction, derived only from what claim-jobs.sql
+-- read/wrote AT THE TIME - never included is_new_conversation, so without
+-- this migration the widened RETURNING would fail at runtime under
+-- wp_scheduler with a column-privilege error.
+--
+-- COLUMN LIST - single column, DERIVED DIRECTLY FROM the RETURNING-list
+-- edit, NOT GUESSED:
+--   message_jobs SELECT (is_new_conversation)
+--     - claim-jobs.sql's RETURNING now includes j.is_new_conversation;
+--       nothing else in the claim statement reads or writes it (it is not
+--       an eligibility predicate, not part of the SET list) so SELECT is
+--       the only privilege needed, matching 0012's own column-scoped
+--       pattern (narrow SELECT/UPDATE column sets, no table-level grant).
+--
+-- wp_app - NOT granted here, and correctly so: checked against
+-- db/schema/grants.snapshot.json before writing this migration. wp_app's
+-- existing grants on message_jobs (SELECT/INSERT/UPDATE, migration 0007)
+-- are already the full column set including is_new_conversation - it is
+-- the role that WRITES the classification at job-creation time
+-- (POST /v1/messages), so it already has everything it needs. wp_admin_app
+-- and wp_migrator are in the same position (also already covering this
+-- column per their existing grants). Only wp_scheduler - narrowed to an
+-- explicit column allow-list by 0012 specifically because it is the
+-- claim's role - was missing it, and only because the column simply was
+-- not part of claim-jobs.sql's RETURNING list until now.
+GRANT SELECT (is_new_conversation) ON message_jobs TO wp_scheduler;

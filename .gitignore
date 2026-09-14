@@ -1,0 +1,115 @@
+# Root ignore rules for the whole workspace.
+#
+# READ THIS FIRST: this repository is NOT a git repository and must never
+# become one (ADR 0003, founder constraint 2026-08-25; `.claude/settings.json`
+# denies every git and gh command). There is no `.git` directory here, so
+# nothing below is currently being enforced by git.
+#
+# This file is kept accurate anyway because it is a real, load-bearing manifest
+# of "what in this tree is generated and must never be copied as if it were
+# source". Three things actually read it or its shape today:
+#   - `.prettierignore` and the ESLint config keep the same exclusions, so a
+#     rule that drifts here tends to drift there too.
+#   - backups/zips of D:/kd/wp (the founder's own backup procedure, since ADR
+#     0003 means there is no remote) should skip exactly these paths.
+#   - `/.dockerignore` mirrors most of it; the two are reviewed together.
+# If the no-VCS decision is ever lifted, this file is already correct.
+#
+# Per-project ignore files are deliberately NOT used. In a pnpm workspace the
+# root file governs every project, and splitting the rules across app/, admin/
+# and website/ creates four places for the same rule to rot. Anything specific
+# to one project is written below under a heading that names it.
+
+# ---------------------------------------------------------------------------
+# Dependencies
+# ---------------------------------------------------------------------------
+node_modules/
+
+# ---------------------------------------------------------------------------
+# Build output
+#
+# Every one of these is produced by `pnpm run build`, `vite build`,
+# `next build`, or `tsc -b`. `dist/` alone is not enough: this workspace has
+# 14 `*.tsbuildinfo` files (tsc's incremental cache, one per composite
+# project) and three website-specific output directories.
+# ---------------------------------------------------------------------------
+dist/
+build/
+out/
+.next/
+*.tsbuildinfo
+
+# ---------------------------------------------------------------------------
+# Test, lint and tooling caches
+# ---------------------------------------------------------------------------
+coverage/
+.eslintcache
+.turbo/
+.vite/
+*.log
+
+# app/frontend and admin/frontend: TanStack Router's own scratch directory.
+# Note this is NOT `src/routeTree.gen.ts` - that file is generated too, but it
+# is imported by `app.tsx` and must stay tracked (it is listed in
+# `.prettierignore` instead, so it is never reformatted by hand).
+.tanstack/
+
+# website/ runs Playwright (`pnpm -F website test:e2e`) and Lighthouse
+# (`test:perf`); both write result directories next to the project.
+test-results/
+playwright-report/
+blob-report/
+.lighthouseci/
+
+# ---------------------------------------------------------------------------
+# Secrets and machine-local state
+#
+# `.secrets/` is the DESIGNATED local secret store (dev.env, dev key rings from
+# scripts/gen-key-ring.mjs). It is machine-local by design and is also
+# allow-listed in `.gitleaks.toml` for exactly that reason - the secret scanner
+# exists to catch secrets OUTSIDE this directory.
+# ---------------------------------------------------------------------------
+.secrets/
+.env
+.env.*
+!.env.example
+
+# Machine-local object-store data (P20 Unit U3 - the fs driver's default
+# rootDir). Holds uploaded tenant CSVs and media; deliberately outside every
+# guard's scan globs so tenant content is never scanned or committed.
+.data/
+
+# ---------------------------------------------------------------------------
+# Agent / editor local state
+# ---------------------------------------------------------------------------
+.claude/settings.local.json
+CLAUDE.local.md
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Claude Code auto-memory is machine-local. Project knowledge that a fresh
+# clone needs lives in .memory/decisions, lessons and research instead, and
+# those ARE tracked.
+.memory/auto/*
+!.memory/auto/README.md
+
+# ---------------------------------------------------------------------------
+# External reference repos reviewed under ADR 0012 (not part of WP)
+#
+# ~450 MB of Blastup + evolution-api, cloned under a scoped git exception for
+# review only. Nothing under app/, admin/, website/, packages/, db/ or
+# scripts/ imports from it.
+# ---------------------------------------------------------------------------
+demo/
+
+# ---------------------------------------------------------------------------
+# NOT listed here on purpose
+#
+# Deploy image tarballs (~350 MB each) are written OUTSIDE this tree, to
+# ../wp-deploy-artifacts, by infra/deploy/build-image.sh. They are not ignored
+# here because they never appear here: `scripts/check-tree.ts` enforces the
+# ADR 0014 top-level tree and would fail the gate on a new root directory.
+# ---------------------------------------------------------------------------

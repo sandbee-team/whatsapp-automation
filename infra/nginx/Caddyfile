@@ -1,0 +1,112 @@
+# Caddyfile (2026-09-15) - the production edge for the app panel and the
+# admin panel. Scope: app.<domain> and admin.<domain> ONLY - website/ is out
+# of scope for this box (founder's call; see docs/runbooks/aws-first-deployment.md
+# and infra/deploy/README.md for the rest of the deploy shape). This file
+# implements exactly what infra/nginx/README.md documents for Caddy; read
+# that file first if you are changing anything here.
+#
+# WHY TWO SUBDOMAINS, NOT PATH PREFIXES:
+# The refresh cookie is `sameSite: 'strict'` + `secure: true`
+# (app/backend/src/modules/identity/routes-shared.ts's setRefreshCookie, and
+# admin/frontend's own wp_admin_rt cookie), and both SPAs call only RELATIVE
+# `/v1/...` / `/admin/v1/...` paths with `credentials: 'include'`
+# (app/frontend/src/lib/api-client.ts, admin/frontend/src/lib/api-client.ts).
+# That means the SPA and its API MUST be same-origin - a path-prefix split
+# (one origin serving both `/app` and `/admin`) would still be same-origin for
+# cookies, but neither SPA sets a TanStack Router `basepath`, so both assume
+# they are mounted at `/`. Two subdomains keep each app at `/` on its own
+# origin, which needs no frontend code change.
+#
+# `{$VAR}` placeholders below are Caddy's own env-var syntax (distinct from
+# compose `${VAR}` interpolation) - Caddy reads its process environment
+# directly, so these come from whatever env the `caddy` compose service is
+# given (see docker-compose.prod.yml's `caddy` service `environment:` block).
+#
+# Automatic HTTPS: Caddy requests and renews certificates for the domain
+# names in the site blocks below via ACME (Let's Encrypt) automatically -
+# there is no `tls` directive because the default (automatic, HTTP-01/TLS-ALPN
+# challenge on ports 80/443) is exactly what a single public box needs. The
+# ACME account email comes from the global `email` directive so renewal
+# notices have somewhere to go.
+{
+	email {$ACME_EMAIL}
+}
+
+# ---------------------------------------------------------------------------
+# app.<domain> - app/frontend SPA + app-backend API
+# ---------------------------------------------------------------------------
+{$APP_DOMAIN} {
+	# Compression is load-bearing, not a nicety: the LCP budget in
+	# docs/evidence/P29-lcp-india4g.md was measured on compressed transfer,
+	# and the same build served identity-encoded fails it (README's
+	# "Compression" section). zstd first, gzip fallback for clients that
+	# don't advertise zstd.
+	encode zstd gzip
+
+	# `/v1/*` -> api:3000. Matched BEFORE the catch-all file_server/SPA
+	# fallback below, so this must come first in the file (Caddy evaluates
+	# route matchers in the order they appear in a site block).
+	handle /v1/* {
+		reverse_proxy api:3000 {
+			# SSE-safe: GET /v1/events (app/frontend/src/lib/sse.ts) is a
+			# long-lived stream. flush_interval -1 flushes every write to the
+			# client immediately instead of buffering, which is what an SSE
+			# heartbeat needs to arrive without delay (README's "SSE-safe
+			# proxy rules" section; the equivalent nginx knobs are
+			# proxy_buffering off + proxy_read_timeout 1h).
+			flush_interval -1
+
+			# REPLACE X-Forwarded-For, never append. `header_up` with a plain
+			# value overwrites the header outright (Caddy does not append
+			# unless you use `+X-Forwarded-For`), which is what
+			# app-backend's TRUST_PROXY / admin-api's rate limiter needs -
+			# an appended header would let a caller prepend a spoofed IP
+			# ahead of the real one (README's "X-Forwarded-For rewrite"
+			# section).
+			header_up X-Forwarded-For {remote_ip}
+		}
+	}
+
+	# Everything else: serve the built SPA, falling back to index.html for
+	# any path Caddy can't find on disk so TanStack Router's client-side
+	# routes deep-link correctly (a hard refresh on e.g. /inbox/123 must not
+	# 404).
+	root * /srv/app
+	file_server
+	try_files {path} /index.html
+
+	# Security headers (HSTS, CSP, etc.) are deliberately NOT set here - the
+	# README says they belong per-route in each application, not the edge,
+	# so they stay wherever app/backend and app/frontend already set them.
+}
+
+# ---------------------------------------------------------------------------
+# admin.<domain> - admin/frontend SPA + admin-backend API
+# ---------------------------------------------------------------------------
+{$ADMIN_DOMAIN} {
+	encode zstd gzip
+
+	# admin/frontend calls relative `/admin/v1/...` (admin/frontend/src/lib/
+	# api-client.ts), so the proxy path prefix is `/admin/v1/*`, matching the
+	# admin-backend's own route prefix - proxied to admin-api:3001 unchanged.
+	handle /admin/v1/* {
+		reverse_proxy admin-api:3001 {
+			# Same SSE-safety rationale as the app site block above, kept
+			# even though admin/frontend has no SSE stream today - it costs
+			# nothing on a plain request/response and avoids a silent
+			# regression if one is added later.
+			flush_interval -1
+
+			# Load-bearing for admin-api's per-IP rate limiter AND its
+			# ADMIN_IP_ALLOWED_CIDRS allow-list (admin/backend/src/platform/
+			# config.ts) - both read req.ip via ADMIN_TRUST_PROXY, which
+			# only makes sense if this header is trustworthy, i.e. replaced,
+			# never appended.
+			header_up X-Forwarded-For {remote_ip}
+		}
+	}
+
+	root * /srv/admin
+	file_server
+	try_files {path} /index.html
+}

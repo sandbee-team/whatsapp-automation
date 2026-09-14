@@ -1,0 +1,29 @@
+{
+  "uid": "fixture-unknown-metric-bad",
+  "title": "Fixture: metric typo",
+  "tags": ["wp"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Send attempts (typo)",
+      "description": "Fixture panel - should fail the guard (typo'd metric name).",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (result) (rate(wp_send_attemps_total[5m]))"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    }
+  ]
+}

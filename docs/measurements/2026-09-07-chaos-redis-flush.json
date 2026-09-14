@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "kind": "chaos-fleet-run",
+  "capturedAtIso": "2026-09-07T12:45:24.385Z",
+  "hardware": {
+    "cpuModel": "12th Gen Intel(R) Core(TM) i5-12500",
+    "cpuCount": 12,
+    "totalMemBytes": 34033348608,
+    "kernel": "10.0.26200",
+    "cgroupVersion": 0
+  },
+  "node": "v24.19.0",
+  "fleet": {
+    "instances": 300,
+    "workers": 6,
+    "sessionsPerWorker": 50,
+    "tenants": 6
+  },
+  "records": [
+    {
+      "schemaVersion": 1,
+      "kind": "chaos",
+      "scenario": "redis-flush",
+      "capturedAtIso": "2026-09-07T12:45:23.966Z",
+      "fleet": {
+        "instances": 300,
+        "workers": 6,
+        "sessionsPerWorker": 50
+      },
+      "measurements": {
+        "sendsObserved": 300,
+        "msToAllInstancesReownedAfterFlush": 5,
+        "fenceRegressionDelta": 0,
+        "instancesStillOwned": 300,
+        "redisSigDbsizeDelta": 0
+      },
+      "sloTargets": {
+        "sendsObserved": "> 0 (a run with zero send_attempts rows proves nothing about the send path)",
+        "fenceRegressionDelta": "== 0 (fence is strictly monotonic per instance)",
+        "instancesStillOwned": "== 300 (no instance orphaned by a ctl flush)",
+        "redisSigDbsizeDelta": "== 0 (the ratchet store is never touched, ADR 0018 S5)"
+      },
+      "verdict": "PASS",
+      "problems": [],
+      "notes": [
+        "redisSigDbsizeDelta read through a SEPARATE resolveSigRedisUrl() connection - inside this harness handles.redisSig resolves to the same physical server as redisCtl, so a diff on the fleet handle would prove nothing."
+      ]
+    }
+  ]
+}

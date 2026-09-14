@@ -1,0 +1,18 @@
+{
+  "motion": {
+    "duration": {
+      "fast": { "$value": "120ms", "$type": "duration" },
+      "normal": { "$value": "180ms", "$type": "duration" },
+      "slow": { "$value": "300ms", "$type": "duration" },
+      "slower": { "$value": "600ms", "$type": "duration" },
+      "pulse": { "$value": "1800ms", "$type": "duration" },
+      "drift": { "$value": "6s", "$type": "duration" },
+      "glacial": { "$value": "12s", "$type": "duration" }
+    },
+    "easing": {
+      "standard": { "$value": "cubic-bezier(0.2, 0, 0, 1)", "$type": "cubicBezier" },
+      "decelerate": { "$value": "cubic-bezier(0, 0, 0.2, 1)", "$type": "cubicBezier" },
+      "accelerate": { "$value": "cubic-bezier(0.3, 0, 1, 1)", "$type": "cubicBezier" }
+    }
+  }
+}

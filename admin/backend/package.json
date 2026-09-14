@@ -1,0 +1,29 @@
+{
+  "name": "admin-backend",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "dev": "tsx --import ./scripts/load-dev-env.ts src/index.ts",
+    "test:int": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "^2.1.0",
+    "@fastify/cookie": "^11.1.2",
+    "@wp/contracts": "workspace:*",
+    "@wp/db": "workspace:*",
+    "@wp/domain": "workspace:*",
+    "@wp/server-kit": "workspace:*",
+    "@wp/utils": "workspace:*",
+    "fastify": "^5.12.1",
+    "jose": "^6.2.10",
+    "otplib": "^13.5.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.3.0",
+    "tsx": "^4.23.12",
+    "vitest": "^4.1.11"
+  }
+}

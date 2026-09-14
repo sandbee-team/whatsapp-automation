@@ -1,0 +1,31 @@
+{
+  "extends": "../packages/config/tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": ".",
+    "outDir": "dist",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "preserve",
+    // Deviation from the base config's `module`/`moduleResolution: NodeNext`:
+    // Next's own subpath modules (`next/link`, `next/dynamic`, ...) ship
+    // with no package.json `exports` map, so Node's ESM resolver (which
+    // NodeNext enforces) rejects them outright - this is standard Node.js
+    // ESM behaviour, not a bug. `module: ESNext` + `moduleResolution:
+    // bundler` is TypeScript's (and Next.js's own generated tsconfig's)
+    // documented pairing for bundler-driven frameworks that never run
+    // through Node's runtime resolver; webpack (via the `extensionAlias`
+    // below) already resolves our `.js`-extension relative imports
+    // correctly. Scoped to this one project only.
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "plugins": [{ "name": "next" }]
+  },
+  "include": ["src", "next-env.d.ts", ".next/types/**/*.ts"],
+  "exclude": ["node_modules", "dist", "out", "tests"],
+  "references": [
+    { "path": "../packages/ui" },
+    { "path": "../packages/design-tokens" },
+    { "path": "../packages/domain" },
+    { "path": "../packages/utils" }
+  ]
+}

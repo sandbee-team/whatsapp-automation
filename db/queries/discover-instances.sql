@@ -1,0 +1,51 @@
+-- discover-instances.sql (P09 Unit U3) - the fleet-wide discovery scan
+-- source, query-only file mirroring `db/queries/lease-scan-unowned.sql`'s own
+-- shape exactly. The actual predicate below is documentation of the blueprint
+-- literal this scan enforces - it is NOT independently executed against a
+-- table: the discovery LOOP (`app/backend/src/engine/fleet/discovery.ts`)
+-- runs it through the EXISTING read-only SECURITY DEFINER function
+-- `wp_lease_scan_unowned` (migration 0018/0019, `stale_ms`/`max_rows`
+-- parameterized), reached via `engine/lease/lease-state-repo.ts`'s already-
+-- registered `scanUnowned` (see `scripts/registries/cross-tenant-queries.ts`'s
+-- `"db/queries/lease-scan-unowned.sql:lease-scan-unowned"` entry, executes as
+-- `wp_scheduler`) - no new definer function, no migration: the P06 function's
+-- body already matches this predicate VERBATIM (verified against migration
+-- 0019's `CREATE OR REPLACE FUNCTION public.wp_lease_scan_unowned`), with
+-- `stale_ms` supplied as a PARAMETER (see below for the shipped value this
+-- phase's own discovery LOOP actually passes):
+--
+--   desired_state = 'online'
+--   AND deleted_at IS NULL
+--   AND link_state IN ('linked', 'pairing')
+--   AND health_state <> 'logged_out'
+--   AND (lease_seen_at IS NULL OR lease_seen_at < now() - make_interval(secs => $stale_ms / 1000.0))
+--   ORDER BY random()
+--   LIMIT 50
+--
+-- WARNING FIX 8 (corrected doc): `engine/fleet/discovery.ts`'s
+-- `DISCOVERY_STALE_MS` shipped value is `30_000`ms (3x `TIMING.heartbeatMs`,
+-- the SAME liveness-detection safety margin `TIMING.leaseTtlMs` itself uses -
+-- see that constant's own doc comment for the full P09 fleet-recovery-fix
+-- rationale: the original 45_000ms literal left zero SLA headroom against
+-- the mandatory <=45s takeover budget), NOT the 45-second figure this
+-- header previously (and incorrectly) documented. This is a DELIBERATE
+-- divergence from `fleet-gauges.sql`'s own unowned-instance-count gauge
+-- predicate, which stays at the canon 45-second alert threshold on purpose:
+-- the discovery SCAN's threshold controls how soon a row becomes eligible
+-- for a takeover grab (shorter = more SLA headroom for the grab itself),
+-- while the GAUGE's threshold controls when an operator is alerted that an
+-- instance has been unowned too long (a separate, intentionally more
+-- conservative, alerting concern) - the two are not meant to match, and
+-- keeping them different is the CORRECT behavior, not a bug.
+--
+-- Projects ONLY (instance_id, client_id) - exactly what lease acquisition
+-- needs to attempt a grab (LeaseManager.acquire takes instanceId + clientId,
+-- nothing else). No health/placement column is ever selected here (the
+-- `health_state <> 'logged_out'` predicate is link-liveness only, enforced
+-- inside the definer function, never read back into application code as a
+-- score). Registered in scripts/registries/cross-tenant-queries.ts under this
+-- file's own key even though it delegates - the delegation itself is the
+-- audited surface, not a duplicate SQL statement.
+
+-- name: discover-instances (delegates to wp_lease_scan_unowned - see header)
+SELECT instance_id, client_id FROM wp_lease_scan_unowned($stale_ms, $max_rows);

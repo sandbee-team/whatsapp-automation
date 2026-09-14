@@ -1,0 +1,187 @@
+{
+  "uid": "wp-pacing",
+  "title": "WP pacing (safe-mode)",
+  "tags": ["wp"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Pacing deferrals and denies by reason",
+      "description": "Pacing reserve denials (requeues, never a job failure) and terminal refusals, by reason. Runbook: docs/RUNBOOK.md#pacing.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (reason) (rate(wp_pacing_deferrals_total[5m]))",
+          "legendFormat": "deferral {{reason}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (reason) (rate(wp_pacing_denies_total[5m]))",
+          "legendFormat": "deny {{reason}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Pacing reserve p99",
+      "description": "p99 wall time of reserve() round trips (claim + reserve). Threshold 0.025s (the P26 gate). Runbook: docs/RUNBOOK.md#pacing.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(wp_pacing_reserve_seconds_bucket[5m])))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.025 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Fleet minimum health score",
+      "description": "Minimum health score across instances evaluated in the most recent evaluator-loop pass. Runbook: docs/RUNBOOK.md#pacing.",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "wp_health_score" }],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Health band changes (1h)",
+      "description": "Applied health-band changes over the trailing hour, by from/to band. Runbook: docs/RUNBOOK.md#pacing.",
+      "gridPos": { "h": 8, "w": 16, "x": 8, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (from, to) (increase(wp_health_band_changes_total[1h]))",
+          "legendFormat": "{{from}} -> {{to}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Pacing band flaps (1d)",
+      "description": "Flap-suppressed band loosenings over the trailing day. Threshold 3. Runbook: docs/RUNBOOK.md#pacing.",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum(increase(wp_pacing_band_flaps_total[1d]))" }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 3 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Warm-up tier changes (1d)",
+      "description": "Warm-up ladder tier changes applied by the pacing evaluator over the trailing day, by result. Runbook: docs/RUNBOOK.md#pacing.",
+      "gridPos": { "h": 8, "w": 16, "x": 8, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (result) (increase(wp_warmup_tier_changes_total[1d]))",
+          "legendFormat": "{{result}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Content-guard trips by reason",
+      "description": "Content-guard pipeline trips (terminal disposal or deferral), by reason. Runbook: docs/RUNBOOK.md#pacing.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (reason) (rate(wp_content_guard_trips_total[5m]))",
+          "legendFormat": "{{reason}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Hard-signal pauses (1h)",
+      "description": "Applied hard-signal pauses over the trailing hour, by pause reason. Runbook: docs/RUNBOOK.md#pacing.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (signal) (increase(wp_hard_signal_pauses_total[1h]))",
+          "legendFormat": "{{signal}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Opt-out cancelled jobs",
+      "description": "Jobs disposed by the guard pipeline specifically for OPT_OUT. Runbook: docs/RUNBOOK.md#pacing.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "rate(wp_optout_cancelled_jobs_total[5m])" }],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Paused instances",
+      "description": "Count of instances currently in health_state paused (encoding: 0 never_linked, 1 connected, 2 degraded, 3 paused, 4 logged_out). Runbook: docs/RUNBOOK.md#pacing.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "count(wp_instance_health_state == 3)" }],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    }
+  ]
+}

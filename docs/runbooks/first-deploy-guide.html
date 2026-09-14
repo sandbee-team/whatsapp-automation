@@ -1,0 +1,665 @@
+<title>First Deploy Runbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+  :root {
+    --ground: #FBF9F6;
+    --raised: #FFFFFF;
+    --sunken: #F2EEE8;
+    --ink: #17191C;
+    --ink-soft: #55575C;
+    --ink-faint: #85878C;
+    --rule: #E2DDD4;
+    --rule-strong: #CFC8BC;
+    --accent: #C4641B;
+    --accent-soft: #FBEEE1;
+    --good: #256C66;
+    --good-soft: #E3F0EE;
+    --danger: #A33A26;
+    --danger-soft: #F9E7E3;
+    --code-bg: #14171A;
+    --code-ink: #E6E3DD;
+    --code-dim: #8A8F96;
+
+    --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+    --body: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+    --mono: 'JetBrains Mono', 'Cascadia Mono', Consolas, monospace;
+  }
+
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --ground: #101215;
+      --raised: #191C20;
+      --sunken: #15181B;
+      --ink: #EDEBE7;
+      --ink-soft: #AFB2B7;
+      --ink-faint: #7C8085;
+      --rule: #2A2E33;
+      --rule-strong: #3B4046;
+      --accent: #E8873A;
+      --accent-soft: #2B1D11;
+      --good: #4FA79E;
+      --good-soft: #14251F;
+      --danger: #D2664E;
+      --danger-soft: #2A1714;
+      --code-bg: #0A0C0E;
+      --code-ink: #E6E3DD;
+      --code-dim: #767B82;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #101215;
+    --raised: #191C20;
+    --sunken: #15181B;
+    --ink: #EDEBE7;
+    --ink-soft: #AFB2B7;
+    --ink-faint: #7C8085;
+    --rule: #2A2E33;
+    --rule-strong: #3B4046;
+    --accent: #E8873A;
+    --accent-soft: #2B1D11;
+    --good: #4FA79E;
+    --good-soft: #14251F;
+    --danger: #D2664E;
+    --danger-soft: #2A1714;
+    --code-bg: #0A0C0E;
+    --code-ink: #E6E3DD;
+    --code-dim: #767B82;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.65;
+    margin: 0;
+    padding-block: 0 5rem;
+    padding-left: 20px;
+    padding-right: 20px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 860px; margin: 0 auto; }
+
+  /* ---------- masthead ---------- */
+  .masthead {
+    padding-block: 3.5rem 2.5rem;
+    border-bottom: 2px solid var(--ink);
+  }
+  .kicker {
+    font-family: var(--display);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 0.9rem;
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(2.1rem, 6vw, 3.4rem);
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+    margin: 0 0 1rem;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-size: 1.14rem;
+    color: var(--ink-soft);
+    margin: 0;
+    max-width: 62ch;
+  }
+
+  /* ---------- meta strip ---------- */
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 2.5rem;
+    padding-block: 1.1rem;
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--display);
+    font-size: 0.8rem;
+  }
+  .meta div { display: flex; gap: 0.5rem; align-items: baseline; }
+  .meta dt { color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.68rem; }
+  .meta dd { margin: 0; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+  /* ---------- sections ---------- */
+  section { padding-block: 2.8rem; border-bottom: 1px solid var(--rule); }
+  section:last-of-type { border-bottom: none; }
+
+  h2 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 1.62rem;
+    letter-spacing: -0.012em;
+    line-height: 1.15;
+    margin: 0 0 0.5rem;
+    text-wrap: balance;
+    display: flex;
+    gap: 0.85rem;
+    align-items: baseline;
+  }
+  .num {
+    font-family: var(--mono);
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 3px;
+    padding: 0.18em 0.5em;
+    flex: none;
+    font-variant-numeric: tabular-nums;
+  }
+  h3 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.04rem;
+    margin: 2rem 0 0.5rem;
+    letter-spacing: -0.005em;
+  }
+  p { margin: 0 0 1rem; max-width: 66ch; }
+  .lede { color: var(--ink-soft); margin-bottom: 1.6rem; max-width: 66ch; }
+
+  ul, ol { max-width: 66ch; padding-left: 1.3rem; margin: 0 0 1rem; }
+  li { margin-bottom: 0.45rem; }
+
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+
+  /* ---------- code ---------- */
+  .cmd {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    line-height: 1.7;
+    padding: 1rem 1.15rem;
+    border-radius: 5px;
+    overflow-x: auto;
+    margin: 0 0 0.5rem;
+    white-space: pre;
+    tab-size: 2;
+  }
+  .cmd .c { color: var(--code-dim); }
+  .why {
+    font-size: 0.9rem;
+    color: var(--ink-soft);
+    margin: 0 0 1.5rem;
+    padding-left: 0.1rem;
+    max-width: 66ch;
+  }
+  .why::before { content: "↳ "; color: var(--accent); font-family: var(--mono); }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.85em;
+    background: var(--sunken);
+    padding: 0.1em 0.34em;
+    border-radius: 3px;
+    border: 1px solid var(--rule);
+  }
+
+  /* ---------- callouts ---------- */
+  .note {
+    border-left: 3px solid var(--rule-strong);
+    background: var(--sunken);
+    padding: 0.95rem 1.15rem;
+    margin: 0 0 1.5rem;
+    border-radius: 0 4px 4px 0;
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note.warn { border-left-color: var(--danger); background: var(--danger-soft); }
+  .note.ok { border-left-color: var(--good); background: var(--good-soft); }
+  .note-label {
+    font-family: var(--display);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 0.35rem;
+    color: var(--ink-faint);
+  }
+  .note.warn .note-label { color: var(--danger); }
+  .note.ok .note-label { color: var(--good); }
+
+  /* ---------- tables ---------- */
+  .tw { overflow-x: auto; margin: 0 0 1.5rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 0.6rem 0.85rem 0.6rem 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th {
+    font-family: var(--display);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    border-bottom: 1px solid var(--rule-strong);
+    white-space: nowrap;
+  }
+  td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 0.84rem; }
+
+  /* ---------- checklist ---------- */
+  .check { list-style: none; padding: 0; margin: 0 0 1.5rem; }
+  .check li {
+    display: flex;
+    gap: 0.7rem;
+    align-items: flex-start;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .check li:last-child { border-bottom: none; }
+  .check input { margin-top: 0.42rem; flex: none; accent-color: var(--accent); width: 15px; height: 15px; }
+  .check label { cursor: pointer; }
+
+  /* ---------- decision cards ---------- */
+  .opts { display: grid; gap: 0.9rem; margin: 0 0 1.5rem; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  .opt { background: var(--raised); border: 1px solid var(--rule); border-radius: 5px; padding: 1rem 1.1rem; }
+  .opt.pick { border-color: var(--accent); border-width: 2px; }
+  .opt h4 { font-family: var(--display); font-size: 0.95rem; margin: 0 0 0.15rem; font-weight: 600; }
+  .opt .price { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); font-variant-numeric: tabular-nums; margin-bottom: 0.5rem; }
+  .opt p { font-size: 0.87rem; color: var(--ink-soft); margin: 0; max-width: none; }
+  .tag {
+    display: inline-block;
+    font-family: var(--display);
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    background: var(--accent);
+    color: #fff;
+    padding: 0.15em 0.45em;
+    border-radius: 2px;
+    margin-left: 0.4rem;
+    vertical-align: 0.15em;
+  }
+
+  a { color: var(--accent); text-underline-offset: 2px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+  @media (max-width: 640px) {
+    body { font-size: 16px; }
+    h2 { font-size: 1.36rem; }
+    .meta { gap: 0 1.4rem; }
+  }
+
+  /* ---------- print / save-as-PDF ---------- */
+  @media print {
+    /* Force the light palette: a dark-theme browser would otherwise print
+       near-black pages and burn a cartridge. */
+    :root, :root[data-theme="dark"] {
+      --ground: #FFFFFF; --raised: #FFFFFF; --sunken: #F4F1EC;
+      --ink: #000000; --ink-soft: #333333; --ink-faint: #595959;
+      --rule: #CCCCCC; --rule-strong: #999999;
+      --accent: #A8500F; --accent-soft: #F6EADF;
+      --good: #1D5952; --good-soft: #E8F1EF;
+      --danger: #8A2E1C; --danger-soft: #F8E9E5;
+      --code-bg: #F4F1EC; --code-ink: #000000; --code-dim: #595959;
+    }
+    @page { margin: 16mm 14mm; }
+    body { font-size: 10.5pt; padding: 0; }
+    .wrap { max-width: none; }
+
+    /* Never split a step, a command, or a callout across two pages. */
+    section { break-inside: avoid-page; page-break-inside: avoid; padding-block: 1.4rem; }
+    h2 { break-after: avoid-page; page-break-after: avoid; }
+    h3 { break-after: avoid-page; page-break-after: avoid; }
+    .cmd, .note, .opt, table, .check { break-inside: avoid-page; page-break-inside: avoid; }
+    .cmd + .why { break-before: avoid-page; page-break-before: avoid; }
+
+    /* Commands must stay readable on paper: wrap instead of scrolling off. */
+    .cmd {
+      border: 1px solid var(--rule-strong);
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-x: visible;
+    }
+    .tw { overflow-x: visible; }
+
+    .masthead { padding-block: 0 1.2rem; }
+    .opts { grid-template-columns: repeat(3, 1fr); }
+    .check input { -webkit-appearance: none; appearance: none; border: 1.2px solid #000; width: 12px; height: 12px; border-radius: 2px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+<header class="masthead">
+  <p class="kicker">WP · Deployment</p>
+  <h1>Your first deploy, start to finish</h1>
+  <p class="standfirst">Written for someone who has never opened the AWS console. Every command is given in full, with a line underneath saying what it does. Follow it in order and don't skip section 2.</p>
+</header>
+
+<dl class="meta">
+  <div><dt>Time</dt><dd>2–3 hours</dd></div>
+  <div><dt>Cost</dt><dd>₹0–1,700/mo</dd></div>
+  <div><dt>You need</dt><dd>AWS account, a domain, a Gmail account</dd></div>
+</dl>
+
+<section>
+  <h2><span class="num">01</span> What you are building</h2>
+  <p class="lede">One server running six processes, all from a single 352 MB image. You do not install Node, or the code, or a database by hand. Docker does it.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th>Process</th><th>What it does</th><th>Port</th></tr></thead>
+    <tbody>
+      <tr><td class="n">api</td><td>The tenant app and the public API</td><td class="n">3000</td></tr>
+      <tr><td class="n">admin-api</td><td>Your staff panel: plans, wallets, clients</td><td class="n">3001</td></tr>
+      <tr><td class="n">session-worker</td><td>Holds the WhatsApp connections and actually sends</td><td class="n">—</td></tr>
+      <tr><td class="n">cron</td><td>Scheduled cleanup and reconciliation</td><td class="n">—</td></tr>
+      <tr><td class="n">relay</td><td>Delivers events and email</td><td class="n">—</td></tr>
+      <tr><td class="n">migrate</td><td>Runs once per deploy to update the database</td><td class="n">—</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Alongside them run PostgreSQL (the database), two Redis instances, and PgBouncer (a connection pooler). All of that is already written for you in <code>infra/compose/docker-compose.prod.yml</code>.</p>
+</section>
+
+<section>
+  <h2><span class="num">02</span> Pick the right server size</h2>
+  <p class="lede">Read this before you launch anything. The free tier will not run the full product, and finding that out after setup wastes an afternoon.</p>
+
+  <p>AWS gives you 750 hours a month of a <code>t3.micro</code> free for 12 months. That machine has <strong>1 GB of memory</strong>. The session worker alone is configured for 3 GB, because it holds live WhatsApp connections in memory. It will not start on a micro.</p>
+
+  <div class="opts">
+    <div class="opt">
+      <h4>t3.micro</h4>
+      <p class="price">Free · 1 GB</p>
+      <p>Everything works except delivery. People can sign up, log in and queue messages. Nothing reaches WhatsApp. Fine for a demo.</p>
+    </div>
+    <div class="opt pick">
+      <h4>t3.small <span class="tag">Start here</span></h4>
+      <p class="price">≈ ₹1,250/mo · 2 GB</p>
+      <p>The smallest machine that delivers messages. Right for your first real customers.</p>
+    </div>
+    <div class="opt">
+      <h4>t3.medium</h4>
+      <p class="price">≈ ₹2,500/mo · 4 GB</p>
+      <p>Room to breathe. Move here when one server is handling steady traffic.</p>
+    </div>
+  </div>
+
+  <div class="note warn">
+    <span class="note-label">Do not do this</span>
+    <p>Do not lower <code>WORKER_HEAP_BUDGET_MB</code> to squeeze onto a free machine. That number decides how many WhatsApp sessions one worker may hold. Lowering it to fit the box removes the protection that stops a worker running out of memory while it is holding live connections.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">03</span> Create the server</h2>
+
+  <h3>Launch the instance</h3>
+  <p>In the AWS console, search <strong>EC2</strong> and choose <strong>Launch instance</strong>.</p>
+  <ul>
+    <li><strong>Name</strong> — <code>wp-prod</code></li>
+    <li><strong>Image</strong> — Ubuntu Server 24.04 LTS</li>
+    <li><strong>Type</strong> — <code>t3.small</code> (see section 2)</li>
+    <li><strong>Key pair</strong> — create one, name it <code>wp-prod-key</code>, download the <code>.pem</code> file. This is how you log in. There is no password, and AWS will not give you the file again.</li>
+    <li><strong>Storage</strong> — change 8 GB to <strong>30 GB</strong>. It is free and 8 GB fills up fast.</li>
+    <li><strong>Region</strong> — pick the one nearest your customers and use the same one for everything. For India, <code>ap-south-1</code> (Mumbai).</li>
+  </ul>
+
+  <h3>Open the right ports</h3>
+  <p>Under <strong>Network settings → Edit</strong>, remove the default rule and add exactly these two:</p>
+  <div class="tw">
+  <table>
+    <thead><tr><th>Type</th><th>Port</th><th>Source</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>SSH</td><td class="n">22</td><td>My IP</td><td>So only you can log in</td></tr>
+      <tr><td>HTTPS</td><td class="n">443</td><td>Anywhere</td><td>So customers can reach the site</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note warn">
+    <span class="note-label">Never open these</span>
+    <p>Do not add rules for 5432, 6379, 3000 or 3001. Those are the database, Redis and the two applications. They are reachable only from inside the server by design. Exposing them puts your customer data on the public internet.</p>
+  </div>
+
+  <p>Launch it, then click <strong>Elastic IP</strong> in the left menu, allocate one, and associate it with the instance. Without this the server's address changes on every restart and your domain breaks.</p>
+</section>
+
+<section>
+  <h2><span class="num">04</span> Log in and install Docker</h2>
+
+  <div class="cmd">chmod 400 wp-prod-key.pem
+ssh -i wp-prod-key.pem ubuntu@YOUR_ELASTIC_IP</div>
+  <p class="why">Locks the key file so only you can read it, then logs in. On Windows use Git Bash, not Command Prompt. Replace <code>YOUR_ELASTIC_IP</code> with the address you just allocated.</p>
+
+  <div class="cmd">sudo apt update &amp;&amp; sudo apt upgrade -y
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker ubuntu
+exit</div>
+  <p class="why">Updates the system and installs Docker. The third line lets you run Docker without typing <code>sudo</code> every time. You must log out for that to take effect, which is what <code>exit</code> does.</p>
+
+  <div class="cmd">ssh -i wp-prod-key.pem ubuntu@YOUR_ELASTIC_IP
+docker --version</div>
+  <p class="why">Log back in and confirm. You should see a version number. Nothing else gets installed on this machine: no Node, no database, no copy of the code.</p>
+
+  <div class="cmd">sudo mkdir -p /opt/wp /etc/wp/keyring</div>
+  <p class="why">Creates the two folders the deploy expects. <code>/opt/wp</code> holds the compose file, <code>/etc/wp</code> holds your secrets.</p>
+</section>
+
+<section>
+  <h2><span class="num">05</span> Create the S3 bucket for files</h2>
+  <p class="lede">This is where images and documents your customers send are stored.</p>
+
+  <p>In the console, search <strong>S3</strong> → <strong>Create bucket</strong>. Name it something unique like <code>wp-prod-media-yourcompany</code>, in the <em>same region</em> as your server. Leave "Block all public access" ticked. Under Default encryption choose <strong>SSE-S3</strong>.</p>
+
+  <h3>Create a user that can only touch this bucket</h3>
+  <p>Search <strong>IAM</strong> → <strong>Users</strong> → <strong>Create user</strong>, name it <code>wp-prod-s3</code>. Do not give it console access. Attach a policy with exactly these permissions on that one bucket: <code>s3:PutObject</code>, <code>s3:GetObject</code>, <code>s3:DeleteObject</code>, <code>s3:ListBucket</code>.</p>
+
+  <p>Then open the user → <strong>Security credentials</strong> → <strong>Create access key</strong> → choose "Application running outside AWS". Copy both values now; the secret is shown once.</p>
+
+  <div class="note warn">
+    <span class="note-label">Create the bucket first</span>
+    <p>Do not grant <code>s3:CreateBucket</code>. The app tries to create the bucket if it looks missing, and with a correctly limited policy that attempt fails loudly. That is the behaviour you want, as long as the bucket really exists. Create it by hand before first boot and this never comes up.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">06</span> Set up email</h2>
+  <p>Gmail needs an <strong>app password</strong>, not your normal password. Turn on 2-Step Verification in your Google account, then go to <strong>App passwords</strong>, create one named <code>wp</code>, and copy the 16 characters.</p>
+
+  <div class="note">
+    <span class="note-label">Know the ceiling</span>
+    <p>A personal Gmail account sends roughly 500 messages a day. This is used for verification, password reset and alerts, so it is comfortable at 10–15 customers and not at 500. Moving to Amazon SES later changes four settings and no code.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">07</span> Generate your keys</h2>
+  <p class="lede">Run these on your own computer, in the project folder.</p>
+
+  <div class="cmd">node scripts/gen-production-key-ring.mjs --out ./key-ring.json</div>
+  <p class="why">Creates the master key file that encrypts every WhatsApp session and stored secret. It prints a checksum; keep it.</p>
+
+  <div class="note warn">
+    <span class="note-label">This file cannot be replaced</span>
+    <p>Lose it and nothing in your database can be decrypted: every customer must re-scan their WhatsApp QR code. It is not a password you can reset. Keep it in <strong>three</strong> places before you go live — on the server, in an encrypted copy you hold, and in a second sealed copy stored somewhere else. Check all three match with <code>sha256sum key-ring.json</code>.</p>
+  </div>
+
+  <div class="cmd">openssl rand -base64 36   <span class="c"># run this 5 times, one per secret</span></div>
+  <p class="why">Generates the five random secrets below. Use a <em>different</em> value for each; never reuse one.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th>Setting</th><th>What it protects</th></tr></thead>
+    <tbody>
+      <tr><td class="n">AUTH_JWT_SECRET</td><td>Customer login sessions</td></tr>
+      <tr><td class="n">ADMIN_JWT_SECRET</td><td>Your staff login sessions</td></tr>
+      <tr><td class="n">INTERNAL_API_SERVICE_TOKEN_SECRET</td><td>Service-to-service calls</td></tr>
+      <tr><td class="n">LEADS_IP_HASH_SECRET</td><td>Contact-form addresses</td></tr>
+      <tr><td class="n">POSTGRES_PASSWORD</td><td>The database itself</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">08</span> Write the two settings files</h2>
+  <p class="lede">There are two, and mixing them up stops the deploy with a confusing error. This catches people out, so it is worth thirty seconds.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th>File</th><th>Read by</th><th>Copy from</th></tr></thead>
+    <tbody>
+      <tr><td class="n">/opt/wp/.env</td><td>Docker Compose itself, while reading the config</td><td class="n">infra/deploy/compose.env.example</td></tr>
+      <tr><td class="n">/etc/wp/wp.env</td><td>The running applications</td><td class="n">infra/deploy/wp.env.example</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Open each example file, fill in every <code>&lt;placeholder&gt;</code>, and put them on the server at those paths. Then lock them down:</p>
+
+  <div class="cmd">sudo chown root:root /opt/wp/.env /etc/wp/wp.env /etc/wp/keyring/key-ring.json
+sudo chmod 600 /opt/wp/.env /etc/wp/wp.env /etc/wp/keyring/key-ring.json</div>
+  <p class="why">Makes the three secret files readable only by the administrator account.</p>
+
+  <div class="note">
+    <span class="note-label">One setting will lock you out until you set it</span>
+    <p><code>ADMIN_IP_ALLOWED_CIDRS</code> starts empty, which blocks <em>everyone</em> from the staff panel. That is deliberate. Put your own address in it as <code>1.2.3.4/32</code> — search "what is my IP" to find it. Never use <code>0.0.0.0/0</code>, which lets the whole internet reach your admin panel.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">09</span> Deploy</h2>
+  <p class="lede">Two commands, from the project folder on your own computer.</p>
+
+  <div class="cmd">./infra/deploy/build-image.sh</div>
+  <p class="why">Builds the image, boots it once to check it starts, scans it for known vulnerabilities, and saves it to a file. If the scan finds something serious it stops rather than shipping it.</p>
+
+  <div class="cmd">./infra/deploy/ship-image.sh ubuntu@YOUR_ELASTIC_IP TAG</div>
+  <p class="why">Copies the image over, loads it, updates the database, and restarts the services. Use the tag the build step printed. The session worker restarts last and only if it was already running, because it is holding live connections.</p>
+
+  <p>The very first time, the database is empty, so run the setup by hand on the server:</p>
+
+  <div class="cmd">cd /opt/wp
+docker compose -f docker-compose.prod.yml --profile tools run --rm migrate
+docker compose -f docker-compose.prod.yml up -d api admin-api cron relay</div>
+  <p class="why">Creates the database structure, then starts the four always-on services. The session worker is deliberately left out until you have confirmed everything else works.</p>
+
+  <div class="cmd">docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml logs --tail 50 api</div>
+  <p class="why">Shows what is running and the last 50 lines from the app. You are looking for <code>api role listening on :3000</code>.</p>
+</section>
+
+<section>
+  <h2><span class="num">10</span> Put HTTPS in front</h2>
+  <p>The app listens only on the server's own loopback address. Something has to terminate HTTPS and pass traffic through. Caddy does this and gets certificates automatically.</p>
+
+  <div class="cmd">sudo apt install -y caddy</div>
+  <p class="why">Installs it.</p>
+
+  <p>Point your domain's A record at your Elastic IP, then put this in <code>/etc/caddy/Caddyfile</code>:</p>
+
+  <div class="cmd">app.yourdomain.com {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:3000 {
+    flush_interval -1
+    header_up X-Forwarded-For {remote_ip}
+  }
+}</div>
+  <p class="why">Gets a certificate, compresses responses, and forwards traffic to the app. <code>flush_interval -1</code> keeps live status updates working. The header line passes the real visitor address through, which the rate limiter needs.</p>
+
+  <div class="cmd">sudo systemctl reload caddy</div>
+  <p class="why">Applies it. Then open <code>https://app.yourdomain.com</code> in a browser.</p>
+
+  <div class="note">
+    <span class="note-label">After this works</span>
+    <p>Set <code>TRUST_PROXY=true</code> and <code>ADMIN_TRUST_PROXY=true</code> in <code>/etc/wp/wp.env</code>, then redeploy. Do this <em>only</em> once Caddy is in front, because those settings tell the app to believe the forwarded address.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">11</span> Check it end to end</h2>
+  <p class="lede">Do these in order. Each one proves a different part works.</p>
+
+  <ul class="check">
+    <li><input type="checkbox" id="c1"><label for="c1">Sign up with a real email address</label></li>
+    <li><input type="checkbox" id="c2"><label for="c2">Receive the verification email — this proves Gmail works</label></li>
+    <li><input type="checkbox" id="c3"><label for="c3">Log in and set up two-factor with an authenticator app</label></li>
+    <li><input type="checkbox" id="c4"><label for="c4">Create an API key in Settings</label></li>
+    <li><input type="checkbox" id="c5"><label for="c5">Send a test message with that key — expect <code>201 queued</code></label></li>
+    <li><input type="checkbox" id="c6"><label for="c6">Upload an image — this proves S3 works</label></li>
+    <li><input type="checkbox" id="c7"><label for="c7">Reach the staff panel on port 3001 — this proves your IP rule is right</label></li>
+  </ul>
+
+  <p>Only once all seven pass, start the sender and link a real number:</p>
+
+  <div class="cmd">docker compose -f docker-compose.prod.yml up -d session-worker</div>
+  <p class="why">Starts the process that holds WhatsApp connections. On a 1 GB machine this fails on purpose; see section 2.</p>
+
+  <div class="note ok">
+    <span class="note-label">A queued message is not a sent message</span>
+    <p><code>201 queued</code> means the message is safely stored and will be delivered. It is not confirmation that WhatsApp received it. That is deliberate: the API never sends directly, so nothing is lost if the connection drops mid-send.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">12</span> Before your first paying customer</h2>
+  <p class="lede">These are not optional, and none of them is automatic yet.</p>
+
+  <ul class="check">
+    <li><input type="checkbox" id="d1"><label for="d1"><strong>Key ring in three places</strong> — server, your encrypted copy, one sealed copy elsewhere</label></li>
+    <li><input type="checkbox" id="d2"><label for="d2"><strong>Database backups</strong> — set up and tested by restoring one</label></li>
+    <li><input type="checkbox" id="d3"><label for="d3"><strong>Alerts reaching a human</strong> — an alarm nobody sees is not monitoring</label></li>
+    <li><input type="checkbox" id="d4"><label for="d4"><strong>A staff account created</strong> for the admin panel</label></li>
+    <li><input type="checkbox" id="d5"><label for="d5"><strong>Restart survival</strong> — reboot the server and confirm everything comes back</label></li>
+  </ul>
+
+  <div class="note warn">
+    <span class="note-label">Known gaps, stated plainly</span>
+    <p>Backups are documented but not yet wired up, so nothing is backing up until you do it. There is no health check endpoint, so a stuck process will not restart itself or alert you. And the data-retention table published on your legal pages is currently enforced by one job out of eight. Fix the first two before real customers; the third before you make retention promises publicly.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">13</span> When something breaks</h2>
+
+  <h3>A service will not start</h3>
+  <div class="cmd">docker compose -f /opt/wp/docker-compose.prod.yml logs --tail 100 api</div>
+  <p class="why">The app refuses to start rather than run half-configured, and the last line usually names the exact setting that is missing.</p>
+
+  <h3>"required variable POSTGRES_PASSWORD is missing"</h3>
+  <p>The value is in the wrong file. It belongs in <code>/opt/wp/.env</code>, not <code>/etc/wp/wp.env</code>. See section 8.</p>
+
+  <h3>The staff panel will not load</h3>
+  <p>Your address is not in <code>ADMIN_IP_ALLOWED_CIDRS</code>, or your home connection changed it. Check what your address is now and update the setting.</p>
+
+  <h3>Everyday commands</h3>
+  <div class="cmd"><span class="c"># what is running</span>
+docker compose -f /opt/wp/docker-compose.prod.yml ps
+
+<span class="c"># follow the logs live, Ctrl-C to stop</span>
+docker compose -f /opt/wp/docker-compose.prod.yml logs -f api
+
+<span class="c"># restart one service</span>
+docker compose -f /opt/wp/docker-compose.prod.yml restart api
+
+<span class="c"># free up disk after several deploys</span>
+docker image prune -a</div>
+</section>
+
+<section>
+  <h2><span class="num">14</span> Every deploy after this one</h2>
+  <div class="cmd">./infra/deploy/build-image.sh
+./infra/deploy/ship-image.sh ubuntu@YOUR_ELASTIC_IP TAG</div>
+  <p class="why">That is the whole routine. Two commands from your own machine. The server needs nothing installed on it, and there is no copy of the code there to go stale.</p>
+</section>
+
+</div>

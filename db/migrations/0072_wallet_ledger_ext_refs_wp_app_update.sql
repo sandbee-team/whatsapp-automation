@@ -1,0 +1,32 @@
+-- P28 (admin-internal-api-and-panel) Unit U3a - migration 0072.
+--
+-- Grants `wp_app` a column-scoped UPDATE on `wallet_ledger_ext_refs.seq`.
+--
+-- Why this was never needed before: `db/queries/wallet-credit.sql`'s credit
+-- is a TWO-statement sequence - `wallet-credit-ext-ref` INSERTs the ext-ref
+-- placeholder row (seq NULL) and, when a ledger row was actually written,
+-- `wallet-credit-stamp-ext-ref` UPDATEs that row with the real `seq`
+-- (`credit.repo.ts` documents the chain). Migration 0005 granted `wp_app`
+-- only INSERT+SELECT on `wallet_ledger_ext_refs`, so the stamp statement has
+-- always lacked its grant - but every existing credit caller reaches it
+-- through `tenant-db.ts#withTenant`, which sets the `app.client_id` GUC and
+-- does NOT issue `SET LOCAL ROLE`. It therefore runs under whatever login
+-- role the connection has, which in dev/test and in the current deployment
+-- is a role that already carries the privilege - so the gap was invisible.
+--
+-- P28 U3a's `withStaffMutation` (`app/backend/src/modules/internal/
+-- with-staff-mutation.ts`) is the first caller to do the correct thing and
+-- explicitly `SET LOCAL ROLE wp_app` for the whole staff mutation, including
+-- the `creditWalletInTx` call inside it. That immediately surfaced the
+-- missing grant as a SQLSTATE 42501 on `POST /internal/v1/clients/:id/
+-- wallet/credit`.
+--
+-- Scope is deliberately the single `seq` column, mirroring migration 0068's
+-- and 0063's column-scoped-UPDATE idiom: `client_id` and `external_ref` are
+-- the row's IDENTITY (they carry the uniqueness authority that makes the
+-- credit idempotent - migration 0008), and `wp_app` must never be able to
+-- repoint an existing ext-ref at a different tenant or a different reference.
+-- Stamping `seq` once, from NULL to the ledger row the same transaction just
+-- wrote, is the only mutation the credit path needs.
+
+GRANT UPDATE (seq) ON wallet_ledger_ext_refs TO wp_app;

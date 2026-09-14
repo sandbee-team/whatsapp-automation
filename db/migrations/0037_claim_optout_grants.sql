@@ -1,0 +1,33 @@
+-- P14 Unit U4 (phase step 2 claim-side plumbing) - migration 0037.
+-- Forward-only, additive-only. No column dropped, no type changed, no data
+-- rewritten, no REVOKE anywhere in this file.
+--
+-- THE BUG THIS AVOIDS: db/queries/claim-jobs.sql's RETURNING list was
+-- widened (same change set as this migration) to add
+-- `j.recipient_hash, j.send_origin, j.content_fingerprint`, so the claim
+-- statement returns the three columns the opt-out gate and the
+-- exempt-origin pacing reserve need without a second round trip. Same
+-- mechanism as migration 0032's own header, verbatim: message_jobs uses the
+-- narrow per-column grant model migration 0012 introduced for wp_scheduler
+-- (the claim statement's role), and that column list never included these
+-- three - without this migration the widened RETURNING fails at runtime
+-- under wp_scheduler with a column-privilege error.
+--
+-- COLUMN LIST - three columns, DERIVED DIRECTLY FROM the RETURNING-list
+-- edit, NOT GUESSED:
+--   message_jobs SELECT (recipient_hash, send_origin, content_fingerprint)
+--     - claim-jobs.sql's RETURNING now includes all three; none of them is
+--       an eligibility predicate or part of the claim's SET list, so
+--       SELECT is the only privilege needed (same pattern as 0012/0032).
+--
+-- wp_app - NOT granted here: checked against db/schema/grants.snapshot.json
+-- before writing this migration. wp_app's existing grants on message_jobs
+-- (SELECT/INSERT/UPDATE, migration 0007) already cover every column
+-- including these three - it is the role that WRITES recipient_hash/
+-- send_origin at job-creation time (POST /v1/messages,
+-- modules/pacing/internal/system-send.ts) and content_fingerprint
+-- (modules/pacing/content/**). wp_admin_app and wp_migrator are in the same
+-- position. Only wp_scheduler - narrowed to an explicit column allow-list
+-- by 0012 - was missing these, and only because they simply were not part
+-- of claim-jobs.sql's RETURNING list until now.
+GRANT SELECT (recipient_hash, send_origin, content_fingerprint) ON message_jobs TO wp_scheduler;

@@ -1,0 +1,13 @@
+-- acquire.lua (P06 Unit U4) - NX placeholder claim on the lease key. Does
+-- NOT mint a fence (Postgres is the fence authority, see lease-state-repo.ts)
+-- - this only stakes a short-lived Redis claim so a second worker's acquire
+-- attempt fails fast, before either worker touches Postgres.
+--
+-- KEYS[1] = lease key (tenantKey(env, clientId, 'lease', 'i', instanceId))
+-- ARGV[1] = workerId
+-- ARGV[2] = leaseTtlMs
+--
+-- Returns 1 and stakes `workerId|PENDING` (PX ttlMs) when the key did not
+-- already exist; returns 0 and touches nothing when it did (someone else
+-- holds it, mid-acquire or fully owned).
+return redis.call('SET', KEYS[1], ARGV[1] .. '|PENDING', 'PX', ARGV[2], 'NX') and 1 or 0

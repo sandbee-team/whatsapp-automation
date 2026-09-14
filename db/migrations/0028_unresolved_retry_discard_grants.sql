@@ -1,0 +1,99 @@
+-- P12 (queue-recovery-and-echo-spike) Unit U5a - migration 0028.
+--
+-- Forward-only, additive-only. No column added, no column dropped, no type
+-- changed, no BYPASSRLS change, no new role, no policy change. Closes two
+-- missing wp_app grants that only fail in PRODUCTION: unresolved.service.ts
+-- (P12 U5) runs the human retry/discard path inside `tenantDb.withTenant`,
+-- which connects as `wp_app` in production, but the dev/test integration
+-- pool connects as `wp` (superuser-ish, bypasses every ACL check), so both
+-- gaps below were invisible to every existing test - the exact structural
+-- blind spot `.memory/lessons/2026-09-01-bypassrls-test-role-hides-
+-- production-rls.md` already tracks (this is that lesson's fourth
+-- occurrence, and the first one that is a missing GRANT rather than an RLS
+-- policy gap). Verified live against the real database before writing this
+-- file (see the session's probe transcript / task report for both).
+--
+-- GAP 1 - send_attempts UPDATE. `wp_app` has held SELECT-only on
+-- send_attempts since migration 0008 (`GRANT SELECT ON send_attempts TO
+-- wp_app`, line 209 of that file: "dashboards/audit" only - no writer role
+-- was ever granted UPDATE there for wp_app). `retryUnresolved`
+-- (unresolved.service.ts) runs, as its first write:
+--   UPDATE send_attempts SET state = 'reconciled_lost', resolved_at = now()
+--   WHERE client_id = $1 AND message_job_id = $2 AND id = (...)
+-- - the exact statement verified live to fail `permission denied for table
+-- send_attempts` under `SET ROLE wp_app`. COLUMN LIST IS DERIVED DIRECTLY
+-- FROM unresolved.service.ts's retryUnresolved function (the SET clause of
+-- the one UPDATE it issues against send_attempts), NOT GUESSED: exactly
+-- `state` and `resolved_at`, nothing else - discardUnresolved never touches
+-- send_attempts at all.
+--
+-- GAP 2 - unresolved_action_keys UPDATE (action). Migration 0026 granted
+-- `wp_app` only `SELECT, INSERT` on unresolved_action_keys (line 186 of that
+-- file). recordActionKeyOrReplay (unresolved-repo.ts) issues:
+--   INSERT INTO unresolved_action_keys (...) VALUES (...)
+--   ON CONFLICT (client_id, idempotency_key)
+--   DO UPDATE SET action = unresolved_action_keys.action
+--   RETURNING action, (xmax = 0) AS inserted
+-- - an `ON CONFLICT ... DO UPDATE` clause requires UPDATE privilege on the
+-- conflict target's SET-listed columns EVEN ON THE FRESH-INSERT BRANCH,
+-- because Postgres plans the DO UPDATE arm as part of the same statement
+-- regardless of which arm actually fires at runtime - this is exactly the
+-- "passes as wp, fails as wp_app" class the task flagged. Verified live,
+-- twice: (a) under `SET ROLE wp_app` with `app.client_id` genuinely set (the
+-- real RLS-scoped path, no permission-check blind spot) on a FRESH insert
+-- (no existing conflicting row) - `ERROR: permission denied for table
+-- unresolved_action_keys`; (b) after temporarily granting `UPDATE (action)`
+-- in a rolled-back probe transaction, the same statement got past the
+-- permission check (surfaced the expected RLS-policy error instead, since
+-- the probe's `app.client_id` GUC belonged to a different tenant than the
+-- row - i.e. permission denied disappeared and a DIFFERENT, RLS-driven,
+-- error took its place, proving the missing privilege was UPDATE, not
+-- something else). COLUMN LIST IS DERIVED DIRECTLY FROM the DO UPDATE
+-- clause's SET list in unresolved-repo.ts's recordActionKeyOrReplay: exactly
+-- `action`, nothing else (the DO UPDATE never assigns any other column).
+--
+-- EVERYTHING ELSE IN THE UNRESOLVED PATH WAS CHECKED AND FOUND ALREADY
+-- SUFFICIENT (verified live under SET ROLE wp_app with app.client_id set,
+-- not just read off a migration file):
+--   - message_jobs UPDATE for both the retry-path SET clause (status,
+--     next_attempt_at, needs_user_action, unresolved_reason, unresolved_at)
+--     and the discard-path SET clause (status, cancel_reason, terminal_at,
+--     needs_user_action, unresolved_reason, unresolved_at) - migration
+--     0007's `GRANT SELECT, INSERT, UPDATE ON message_jobs TO wp_app` is
+--     TABLE-LEVEL (unqualified by column list), so it already covers every
+--     column either statement sets. No gap; no grant needed here.
+--   - message_job_refs JOIN message_jobs SELECT (lookupUnresolvedJob) -
+--     message_job_refs already carries `GRANT SELECT, INSERT ON
+--     message_job_refs TO wp_app, wp_scheduler` (migration 0008); the
+--     message_jobs half is covered by the same table-level SELECT above.
+--     No gap.
+--   - delivery_event_ids + delivery_events INSERT (writeDeliveryEvent, both
+--     actions' last-but-one statement) - `GRANT SELECT, INSERT ON
+--     delivery_event_ids TO wp_app, wp_scheduler` (migration 0008) and
+--     `GRANT SELECT, INSERT ON delivery_events TO wp_app, wp_scheduler`
+--     (migration 0009) already cover both statements exactly. No gap.
+--   - audit_logs INSERT (provisioningRepo.insertAuditLog, both actions'
+--     final statement) - `GRANT SELECT, INSERT ON audit_logs TO wp_app`
+--     (migration 0013) already covers it. No gap.
+--
+-- NOT GRANTED, deliberately:
+--   - no DELETE anywhere in this file, on any table - neither action ever
+--     deletes a send_attempts or message_jobs row (core invariant 5: pause/
+--     cancel preserves work; a discarded job is `cancelled`, never removed).
+--   - nothing to wp_admin_app. send_attempts and message_jobs are both
+--     SEND_PATH_TABLES entries (db/src/isolation/send-path-tables.ts);
+--     db/tests/grants-snapshot.test.ts's
+--     `wp_admin_app_has_no_write_grant_on_any_existing_send_path_table` and
+--     this migration's own new unresolved-grants.test.ts both pin that
+--     invariant directly - it stays fully intact, untouched by this file.
+--   - no table-level grant where a column-level one suffices: both GRANT
+--     statements below are column-scoped, matching migration 0025's own
+--     discipline exactly.
+--   - no re-grant of anything migrations 0007/0008/0009/0013/0026 already
+--     cover (see the "already sufficient" list above) - a redundant GRANT
+--     would only be a no-op statement with no snapshot effect, same
+--     precedent migration 0026's own header already applied.
+-- ---------------------------------------------------------------------
+GRANT UPDATE (state, resolved_at) ON send_attempts TO wp_app;
+
+GRANT UPDATE (action) ON unresolved_action_keys TO wp_app;

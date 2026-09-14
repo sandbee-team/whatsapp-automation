@@ -1,0 +1,97 @@
+{
+  "component": "A",
+  "banner": "SOCKET-RESIDENT-PRE-HANDSHAKE (component A, ADR 0032) · SOCKET-ONLY (component B deferred to P10a) · no number here may be quoted to a customer (ADR 0016, ADR 0018 §8)",
+  "capturedAtIso": "2026-09-01T08:31:10.640Z",
+  "profile": "idle",
+  "rawArtifact": "docs/measurements/raw/2026-09-01-componentA-idle.jsonl",
+  "batchAddMsFieldNote": "WARNING 5 (FIX-P10-A): this file's summaries[].batchAddMs (renamed from connectMsP99) is a cumulative BATCH-BUILD duration - one sample per ramp point covering the whole sequential addSessions(delta) loop (~20 ms/socket), NOT a per-socket connect latency. The raw JSONL artifact above is historical evidence and was NOT rewritten - its connectMsP50/connectMsP99 fields carry this same batch-add semantics under their original field names. No per-socket connect/handshake latency was measured this session (carried to P26/M5).",
+  "sampleSize": {
+    "rampPointCount": 4,
+    "N": "4 ramp points (50/250/1000/2000 resident sessions); 12 samples per point over a 60s soak at 5s intervals"
+  },
+  "rampPoints": [50, 250, 1000, 2000],
+  "plannedRampPoints": [50, 250, 1000, 2500],
+  "truncatedRampPoints": [2500],
+  "truncationReason": "2,500 resident sockets plus worker baseline and heap do not fit the 15.5 GiB WSL2 measurement target with headroom (ADR 0032 ramp-design note). Recorded, never fabricated.",
+  "windowsUsed": {
+    "settleMs": 20000,
+    "soakMs": 60000,
+    "sampleIntervalMs": 5000,
+    "specWindows": { "settleMs": 300000, "soakMs": 1200000 },
+    "note": "Session-run windows are SHORTER than the phase spec's 5-min settle / 20-min soak. Forced GC + settle + multi-sample soak were all real; the shortened window is the honest limitation of a single-session run and is why the production feedback loop (ADR 0018 §3, wp_session_rss_bytes_est) remains the authoritative long-run correction."
+  },
+  "hardware": {
+    "cpuModel": "12th Gen Intel(R) Core(TM) i5-12500",
+    "cpuCount": 12,
+    "totalMemBytes": 16608600064,
+    "kernel": "6.6.87.2-microsoft-standard-WSL2",
+    "cgroupVersion": 2
+  },
+  "node": "v24.20.0",
+  "baileysVersion": "7.0.0-rc14",
+  "summaries": [
+    {
+      "sessions": 50,
+      "rssBytes": 331583488,
+      "lagP99Ms": 13.131775,
+      "cpuPct": 0.7096846291125054,
+      "batchAddMs": 1037,
+      "redisSigBytes": 3182736,
+      "pgWriteRowsPerSec": 0
+    },
+    {
+      "sessions": 250,
+      "rssBytes": 375099392,
+      "lagP99Ms": 13.352959,
+      "cpuPct": 0.6785605202340586,
+      "batchAddMs": 3049,
+      "redisSigBytes": 3182736,
+      "pgWriteRowsPerSec": 0
+    },
+    {
+      "sessions": 1000,
+      "rssBytes": 564686848,
+      "lagP99Ms": 14.237695,
+      "cpuPct": 0.8370341212251968,
+      "batchAddMs": 11345,
+      "redisSigBytes": 3182736,
+      "pgWriteRowsPerSec": 0
+    },
+    {
+      "sessions": 2000,
+      "rssBytes": 791670784,
+      "lagP99Ms": 14.548991,
+      "cpuPct": 0.8387590263149388,
+      "batchAddMs": 14963,
+      "redisSigBytes": 3182736,
+      "pgWriteRowsPerSec": 0
+    }
+  ],
+  "fit": {
+    "slopeMbPerSession": 0.2265099719850587,
+    "interceptMb": 304.9964606123266,
+    "rSquared": 0.9993876134429474,
+    "slopeCi95": {
+      "low": 0.20944955987659267,
+      "high": 0.24357038409352474,
+      "width": 0.034120824216932064
+    },
+    "pointCount": 4
+  },
+  "whyTheSlopeNotTotalOverN": {
+    "fittedSlopeMbPerSession": 0.227,
+    "naiveTotalOverNMbPerSession": 0.377,
+    "note": "total RSS / N at the 2,000 point (791670784 B / 2000 = 395835.4 B/session, same MiB base as the fitted slope: 395835.4 / 1048576) = 0.377 MB/session, ~67% higher than the true marginal cost, because the 305 MB fitted intercept (worker baseline, pools, JIT) contaminates it. This is exactly the error the phase forbids."
+  },
+  "redesignForkEvaluation": {
+    "threshold": 60,
+    "componentAOnlyMb": 0.227,
+    "verdict": "Component A alone is far below the 60 MB redesign threshold — nothing in the socket/runtime layer (§1.1 rows 1,2,3,7,11,12) threatens the 10k path shape. The BLENDED figure that the fork actually tests is A + B, and component B (the dominant DM variable: real Signal session/sender-key working set, rows 4,5,6,9) is NOT measured this session. The fork therefore remains formally OPEN until P10a supplies B; on the socket side it is decisively not triggered."
+  },
+  "notMeasured": [
+    "§1.1 rows 4,5,6,9 — userDevicesCache, Signal session working set, group sender-key state, app-state LTHash (component B, P10a, needs real linked numbers)",
+    "post-handshake noise transport cipher state and keepalive-buffer cadence (unreachable synthetically — ADR 0032)",
+    "the initial app-state/query burst a real `open` socket performs",
+    "M6 7-day drift (P26), M8/M9 Postgres load and durable bytes per send (P26)"
+  ]
+}

@@ -1,0 +1,31 @@
+-- P16 Unit E (dirty-set/evaluator-loop, step 9-10) - migration 0046.
+-- Forward-only, additive-only. Closes the gap migration 0045 deliberately
+-- left open (see that file's own note: "eval_tier is DELIBERATELY NOT added
+-- to the UPDATE list: no writer named in the gap report sets it ... Unit E,
+-- out of scope, owns that column's write").
+--
+-- Unit E adds TWO writers of `instance_pacing_state.eval_tier`:
+--   1. `dirty-set.ts#markDirty` - forces eval_due_at=now(), eval_tier=1 from
+--      the fast-lane/send-outcome/connection-update seams.
+--   2. `HealthEvaluator.ts#writeBookkeeping` - now writes the tier ladder's
+--      resolved eval_tier (1/2/3) at the end of every evaluator tick,
+--      replacing the P16 Unit C placeholder that left eval_tier unchanged.
+--
+-- Both run under the SAME wp_scheduler login role as every other P16 health
+-- write path (migration 0045's own header) - no new role, no REVOKE.
+GRANT UPDATE (eval_tier) ON instance_pacing_state TO wp_scheduler;
+
+-- Step 10 (retention wiring, closes Unit A's own reported gap) - CORRECTED
+-- after gate review: the retention sweep runs under the health evaluator's
+-- OWN `wp_scheduler` login role (session-worker-health-loop-wiring.ts's low-
+-- cadence retention timer), NOT under `roles/relay.ts`'s `wp_relay` role.
+-- `wp_relay` is deliberately minimal (P15 grant narrowing,
+-- db/tests/wp-relay-role.test.ts's `wp_relay_has_no_grant_on_any_table_
+-- beyond_the_four_it_owns` containment test) and must never gain a grant on
+-- a fifth table. `wp_scheduler` already holds SELECT, INSERT on
+-- `instance_health_samples` from migration 0044 - only DELETE is new here;
+-- SELECT is already present so no extra grant is needed for the subquery's
+-- own `created_at` predicate read (Postgres requires SELECT on any column
+-- read inside a DELETE's WHERE/subquery, independent of the DELETE grant -
+-- same rule migration 0045's header documents for an UPDATE's WHERE clause).
+GRANT DELETE ON instance_health_samples TO wp_scheduler;

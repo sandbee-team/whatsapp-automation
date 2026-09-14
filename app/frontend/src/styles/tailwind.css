@@ -1,0 +1,41 @@
+/*
+ * tailwind.css (P05 U5; restyled P26b U2) - Tailwind v4 CSS-first entry
+ * point for app/frontend. `@wp/design-tokens` supplies both the raw CSS
+ * custom properties (`tokens.css`) and the generated `@theme` mapping
+ * (`tailwind.css` export, itself named `tailwind-theme.css` on disk) - see
+ * that package's README-equivalent doc comments. `@source` points Tailwind
+ * v4's content scanner at `@wp/ui`'s source so its `bg-accent`/`text-fg`/...
+ * utility classes are generated even though app/frontend never imports
+ * those literal strings itself (they only exist as `cx(...)` arguments
+ * inside packages/ui/src).
+ */
+@import 'tailwindcss';
+@import '@wp/design-tokens/tokens.css';
+@import '@wp/design-tokens/tailwind.css';
+@source '../../../../packages/ui/src';
+
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: var(--font-ui);
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+}
+
+::selection {
+  background-color: var(--color-accent-soft);
+}
+
+/* Thin, token-coloured scrollbars (Firefox + Chromium's `scrollbar-color`). */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}

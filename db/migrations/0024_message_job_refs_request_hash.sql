@@ -1,0 +1,37 @@
+-- P11 (send-path-mvp) Unit U3 - migration 0024.
+-- Adds `request_hash` to `message_job_refs` (migration 0008 owns the
+-- table's original shape - this migration only ALTERs it, forward-only and
+-- additive per canon).
+--
+-- WHY: the enqueue transaction's idempotency-key conflict handling (blueprint
+-- Flow 1, [R-22]) must distinguish a genuine retry (identical request body
+-- replayed under the same `Idempotency-Key`) from a DIFFERENT request body
+-- reusing someone else's key - the latter is a client bug/misuse and must be
+-- rejected with `409 IDEMPOTENCY_KEY_REUSED`, never silently served the
+-- original job as if the bodies matched. `request_hash` is the stored
+-- fingerprint (a SHA-256 digest of the canonicalized request body, computed
+-- app-side) `messages.repo.ts` compares against on every conflict.
+--
+-- NULLABLE, no backfill: every EXISTING `message_job_refs` row (there are
+-- none yet - this table's only writer ships in this same phase) predates
+-- the idempotency-replay-vs-reuse distinction this column exists to draw,
+-- and this migration runs before any application code writes through the
+-- new column. A NOT NULL column here would need a synthetic backfill value
+-- with no real request body behind it - worse than an honest NULL for rows
+-- the column's own invariant never applied to.
+--
+-- NO INDEX: `request_hash` is read by exact-row lookup only, always
+-- alongside the existing `mjr_idem_uq` (client_id, idempotency_key) conflict
+-- - the enqueue transaction's `ON CONFLICT (client_id, idempotency_key)
+-- WHERE idempotency_key IS NOT NULL DO UPDATE ... RETURNING` (see
+-- messages.repo.ts) already resolves to at most one row via that existing
+-- partial unique index, and `request_hash` is only ever compared against
+-- the ALREADY-FOUND row's value in application code - a bare column scan
+-- with no supporting predicate would gain nothing from its own index.
+--
+-- `bytea` (not `text`): a raw digest is a fixed-width byte string, not
+-- human text - matches `content_fingerprint bytea` (migration 0007) and
+-- `checksum bytea` (db/src/migrate.ts's own schema_migrations table), the
+-- established "digest column" type in this schema.
+
+ALTER TABLE message_job_refs ADD COLUMN request_hash bytea;

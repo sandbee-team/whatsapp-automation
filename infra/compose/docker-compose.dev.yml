@@ -1,0 +1,269 @@
+name: wp-dev
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    # P26 U2a: pg_stat_statements preloaded + tracking every statement -
+    # the phase's own hot-query instrument (design doc section 3.6). Purely
+    # additive: no existing behavior changes, `CREATE EXTENSION IF NOT
+    # EXISTS pg_stat_statements;` still has to be run once against the `wp`
+    # database before the view is queryable (the preload alone only makes
+    # the extension AVAILABLE, not installed).
+    command:
+      [
+        'postgres',
+        '-c',
+        'shared_preload_libraries=pg_stat_statements',
+        '-c',
+        'pg_stat_statements.track=all',
+      ]
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-wp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-wp}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-wp} -d ${POSTGRES_DB:-wp}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # pgbouncer (P26 U2a) - design doc section 3.6: PgBouncer in TRANSACTION
+  # pool mode sits in front of Postgres so the fleet-scale measurement can
+  # compare DIRECT-CONNECTION vs POOLED figures under real worker-process
+  # concurrency. `POOL_MODE=transaction` is compatible with this repo's own
+  # `withTenant`'s `SET LOCAL app.client_id` (scoped to the transaction, never
+  # the session) - a session-scoped `SET` would NOT be safe under transaction
+  # pooling, but `SET LOCAL` inside a transaction block is exactly the
+  # transaction-pooling-safe idiom. Named prepared statements are NOT used
+  # anywhere in this codebase (parameterized queries only), so transaction
+  # mode's other classic hazard (prepared statements surviving across a
+  # pooled connection swap) does not apply either. `DEFAULT_POOL_SIZE=60` +
+  # `RESERVE_POOL_SIZE=20` + `MAX_CLIENT_CONN=4000` are the design doc's own
+  # figures; `AUTH_TYPE=scram-sha-256` matches postgres:17's default
+  # `password_encryption`. Does NOT start with the default dev stack
+  # (no `profiles:` restriction - unlike session-worker/cron/relay - because
+  # P26's own bring-up step brings it up explicitly alongside postgres; see
+  # RUNNING-LOCALLY.md).
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.24.1-p1
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-wp}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      DB_NAME: ${POSTGRES_DB:-wp}
+      AUTH_TYPE: scram-sha-256
+      POOL_MODE: transaction
+      DEFAULT_POOL_SIZE: 60
+      RESERVE_POOL_SIZE: 20
+      MAX_CLIENT_CONN: 4000
+      SERVER_IDLE_TIMEOUT: 60
+      ADMIN_USERS: ${POSTGRES_USER:-wp}
+    ports:
+      - '127.0.0.1:${PGBOUNCER_PORT:-56432}:5432'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'PGPASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required} psql -h 127.0.0.1 -p 5432 -U ${POSTGRES_USER:-wp} -d pgbouncer -c "SHOW POOLS" || exit 1',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '127.0.0.1:${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis-sig:
+    image: redis:7
+    restart: unless-stopped
+    command: ['redis-server', '--maxmemory-policy', 'noeviction']
+    ports:
+      - '127.0.0.1:${REDIS_SIG_PORT:-6380}:6379'
+    volumes:
+      - redis_sig_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: ['server', '/data', '--console-address', ':9001']
+    ports:
+      - '127.0.0.1:9000:9000'
+      - '127.0.0.1:9001:9001'
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-wp}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:1025:1025'
+      - '127.0.0.1:8025:8025'
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://localhost:8025/livez']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # session-worker (P09 Unit U5, step 9) - does NOT start with the default
+  # dev stack (`profiles: ["worker"]`; run explicitly with
+  # `--profile worker`). No dedicated backend image exists yet (MASTER-PLAN
+  # S2.1: "One image per backend project. ROLE= selects the process." - a
+  # real image is a later phase); this service runs the same ROLE=
+  # entrypoint app/backend already boots via `node:24` + `pnpm`/`tsx` bare
+  # process, mirroring `main.ts`'s ROLE dispatch (`roles/session-worker.ts`)
+  # exactly. It exists so `stop_grace_period`/`mem_limit` are declared and
+  # guard-checked (`check-box-memory.ts`) - not a production deploy shape.
+  session-worker:
+    image: node:24
+    restart: unless-stopped
+    profiles: ['worker']
+    working_dir: /repo/app/backend
+    # mem_limit derivation: WORKER_HEAP_BUDGET_MB default 3072 (see
+    # platform/config.ts) + baseline/overhead margin for non-heap Node
+    # process memory (sockets, buffers, native modules) -> 3584m (3.5 GB).
+    # These are DERIVED bracket figures - fine here, never in customer-facing
+    # text (see CLAUDE.md/copy guard).
+    #
+    # P10 Unit U6 (step 7): this arithmetic is UNCHANGED this session - the
+    # heap budget itself is not touched. It WILL be recomputed once
+    # WORKER_MEASURED_SESSION_MB_DM_ONLY / WORKER_MEASURED_SESSION_MB_GROUP_ENABLED
+    # (platform/config.ts) are filled with real measured values (P10a,
+    # component B) and/or the production feedback loop
+    # (engine/fleet/session-cost-feedback.ts) has run long enough to move the
+    # cap - do NOT fabricate a "final" mem_limit here before that measurement
+    # lands.
+    #
+    # redis-sig sizing NOTE (U5): REDIS_SIG_MAX_FIELDS_PER_INSTANCE
+    # (platform/config.ts, default 4000) bounds per-instance Signal keystore
+    # fields on the shared redis-sig service, NOT this process's own heap -
+    # it does not feed into mem_limit here, but a redis-sig capacity/mem_limit
+    # review should account for MAX_FIELDS_PER_INSTANCE x live-instance-count
+    # once that service gets its own budget pass.
+    mem_limit: 3584m
+    stop_grace_period: 45s
+    environment:
+      ROLE: session-worker
+      # P25 U2 (step 3): loopback-published on the host via the port mapping
+      # below; Prometheus scrapes via host.docker.internal:9465. Bound to
+      # 0.0.0.0 here because this is a container-private network, not a
+      # public interface - production binds the container hostname, never
+      # 0.0.0.0 (`startMetricsServer` refuses that in production).
+      WP_METRICS_BIND: 0.0.0.0
+      WP_METRICS_PORT: 9464
+    ports:
+      - '127.0.0.1:9465:9464'
+    env_file:
+      - ../../.secrets/dev.env
+    volumes:
+      - ../..:/repo
+    command: ['pnpm', 'exec', 'tsx', 'src/main.ts']
+
+  # cron (P12 Unit U4, step 7) - runs the reaper (15s) and echo-reconciler
+  # (30s +/- jitter) cadences, each single-flighted across replicas via a
+  # Postgres `pg_try_advisory_xact_lock` (`engine/cron/single-flight.ts`).
+  # Does NOT start with the default dev stack (`profiles: ["cron"]`; run
+  # explicitly with `--profile cron`), same convention as `session-worker`
+  # above. `check-box-memory.ts`'s worker-service budget scan only matches
+  # `session-worker(-<suffix>)?` service names (`WORKER_SERVICE_NAME_
+  # PATTERN`) - this service is deliberately named `cron`, not
+  # `session-worker-cron` or similar, so it is correctly OUT of scope for
+  # that budget: it holds no WhatsApp sessions and its memory footprint is a
+  # small, fixed Node process, not a per-session multiplier. `mem_limit:
+  # 512m` is a conservative fixed bound for that fixed-footprint process
+  # (bounded-batch sweeps, never O(active) - ADR 0018 S4), not a derived
+  # figure the way session-worker's 3584m is.
+  cron:
+    image: node:24
+    restart: unless-stopped
+    profiles: ['cron']
+    working_dir: /repo/app/backend
+    mem_limit: 512m
+    stop_grace_period: 15s
+    environment:
+      ROLE: cron
+      # P25 U2 (step 3): same loopback-published/host.docker.internal shape
+      # as session-worker above, on the cron-specific host port.
+      WP_METRICS_BIND: 0.0.0.0
+      WP_METRICS_PORT: 9464
+    ports:
+      - '127.0.0.1:9466:9464'
+    env_file:
+      - ../../.secrets/dev.env
+    volumes:
+      - ../..:/repo
+    command: ['pnpm', 'exec', 'tsx', 'src/main.ts']
+
+  # relay (P15 Unit U4, step 5) - the outbox drain/coalesce/backpressure/
+  # cleanup process (ADR 0010's relay role): drains `outbox_events` every
+  # `RELAY_TICK_MS` (default 500ms), publishes coalesced batch frames
+  # through `modules/realtime/redis-bridge.ts`, and runs a bounded cleanup
+  # sweep. Does NOT start with the default dev stack (`profiles: ["relay"]`;
+  # run explicitly with `--profile relay`), same convention as `cron`/
+  # `session-worker` above. `check-box-memory.ts`'s `WORKER_SERVICE_NAME_
+  # PATTERN` only matches `session-worker(-<suffix>)?` - this service is
+  # deliberately named `relay`, not `session-worker-relay` or similar, so it
+  # stays correctly OUT of scope for that per-session budget: it holds no
+  # WhatsApp sessions and its footprint is a small, fixed Node process plus
+  # one dedicated LISTEN connection, not a per-session multiplier.
+  # `mem_limit: 512m` mirrors `cron`'s own fixed (not derived) bound - same
+  # bounded-batch-per-tick shape (ADR 0018 S4: never O(active)).
+  relay:
+    image: node:24
+    restart: unless-stopped
+    profiles: ['relay']
+    working_dir: /repo/app/backend
+    mem_limit: 512m
+    stop_grace_period: 15s
+    environment:
+      ROLE: relay
+      # P25 U2 (step 3): same loopback-published/host.docker.internal shape
+      # as session-worker/cron above, on the relay-specific host port.
+      WP_METRICS_BIND: 0.0.0.0
+      WP_METRICS_PORT: 9464
+    ports:
+      - '127.0.0.1:9467:9464'
+    env_file:
+      - ../../.secrets/dev.env
+    volumes:
+      - ../..:/repo
+    command: ['pnpm', 'exec', 'tsx', 'src/main.ts']
+
+volumes:
+  postgres_data:
+  redis_data:
+  redis_sig_data:
+  minio_data:

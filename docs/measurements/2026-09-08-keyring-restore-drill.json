@@ -1,0 +1,42 @@
+{
+  "verdict": "PASS",
+  "startedAtIso": "2026-09-08T18:00:58.772Z",
+  "finishedAtIso": "2026-09-08T18:00:58.878Z",
+  "phases": {
+    "provisionMs": 1,
+    "sealMs": 4,
+    "destroyMs": 1,
+    "restoreMs": 33,
+    "verifyMs": 0,
+    "totalMs": 39
+  },
+  "ring": {
+    "purposes": [
+      "session",
+      "tenant-secrets",
+      "user-secrets",
+      "optout-pepper"
+    ],
+    "keyCount": 5,
+    "retiredCount": 1,
+    "activeKekIdsByPurpose": {
+      "session": "session-active-1",
+      "tenant-secrets": "tenant-secrets-active-1",
+      "user-secrets": "user-secrets-active-1",
+      "optout-pepper": "optout-pepper-active-1"
+    }
+  },
+  "record": {
+    "plaintextBytes": 1355,
+    "sealedBytes": 1355,
+    "kekId": "session-active-1"
+  },
+  "destroyedProven": true,
+  "plaintextIdentical": true,
+  "copies": [
+    "host secret store (running copy)",
+    "founder's offline encrypted copy",
+    "sealed second offline copy"
+  ],
+  "problems": []
+}

@@ -1,0 +1,10 @@
+{
+  "extends": "../packages/config/tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "incremental": true
+  },
+  "include": ["**/*.ts", "../infra/backup/**/*.ts", "../docs/__tests__/**/*.ts"],
+  "exclude": ["guards/__fixtures__/**"]
+}

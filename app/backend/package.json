@@ -1,0 +1,43 @@
+{
+  "name": "app-backend",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "dev": "pnpm exec tsx scripts/dev-role.ts all",
+    "dev:api": "pnpm exec tsx scripts/dev-role.ts api",
+    "dev:worker": "pnpm exec tsx scripts/dev-role.ts session-worker",
+    "dev:cron": "pnpm exec tsx scripts/dev-role.ts cron",
+    "dev:relay": "pnpm exec tsx scripts/dev-role.ts relay",
+    "dev:migrate": "pnpm exec tsx scripts/dev-role.ts migrate",
+    "test:int": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.2",
+    "@node-rs/argon2": "^2.1.0",
+    "@orpc/server": "^1.15.0",
+    "@wp/contracts": "workspace:*",
+    "@wp/db": "workspace:*",
+    "@wp/domain": "workspace:*",
+    "@wp/server-kit": "workspace:*",
+    "@wp/utils": "workspace:*",
+    "baileys": "7.0.0-rc14",
+    "csv-parse": "7.0.2",
+    "fastify": "^5.12.1",
+    "ioredis": "^6.0.0",
+    "jose": "^6.2.10",
+    "minio": "8.0.6",
+    "nodemailer": "^9.1.1",
+    "otplib": "^13.5.0",
+    "prom-client": "^15.1.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.3.0",
+    "@types/nodemailer": "^8.0.1",
+    "@types/ws": "^8.18.1",
+    "vitest": "^4.1.11",
+    "ws": "^8.21.3"
+  }
+}

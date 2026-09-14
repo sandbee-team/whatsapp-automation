@@ -1,0 +1,2 @@
+subjectAltName=DNS:safe-fetch.test.local
+basicConstraints=CA:FALSE

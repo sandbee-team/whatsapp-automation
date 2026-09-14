@@ -1,0 +1,75 @@
+// config.alloy (P25 Unit U4, step 5) - discover wp-dev compose containers,
+// tail their Docker logs, translate pino's numeric level to text, sample
+// only routine info lines 1-in-50 (errors/warns and every state-transition
+// line always kept unsampled), and keep ONLY env/role/level as Loki stream
+// labels - client_id/instance_id stay JSON fields, never labels (label
+// cardinality would blow up per-tenant/per-instance, and Loki indexes by
+// label, not by JSON field content).
+
+discovery.docker "wp" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "wp" {
+  targets = discovery.docker.wp.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    regex         = "wp-dev"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "role"
+  }
+}
+
+loki.source.docker "wp" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.docker.wp.targets
+  relabel_rules = discovery.relabel.wp.rules
+  labels        = { env = "dev" }
+  forward_to    = [loki.process.wp.receiver]
+}
+
+loki.process "wp" {
+  forward_to = [loki.write.wp.receiver]
+
+  stage.json {
+    expressions = { level = "level", msg = "msg" }
+  }
+
+  // Pino numeric level -> text: 10 trace, 20 debug, 30 info, 40 warn,
+  // 50 error, 60 fatal.
+  stage.template {
+    source   = "level"
+    template = `{{ if eq .Value "10" }}trace{{ else if eq .Value "20" }}debug{{ else if eq .Value "30" }}info{{ else if eq .Value "40" }}warn{{ else if eq .Value "50" }}error{{ else if eq .Value "60" }}fatal{{ else }}unknown{{ end }}`
+  }
+
+  stage.labels {
+    values = { level = "" }
+  }
+
+  // Sample ONLY routine info lines 1-in-50. Errors/warns and every
+  // state-transition keyword below are excluded from the selector and so
+  // always pass through unsampled.
+  stage.match {
+    selector = `{level="info"} !~ "(?i)(pause|paused|resum|restrict|logged_out|logged out|fence|transition|health_changed|shed|drain|unowned|error|failed)"`
+    action   = "keep"
+
+    stage.sampling {
+      rate = 0.02
+    }
+  }
+
+  stage.label_keep {
+    values = ["env", "role", "level"]
+  }
+}
+
+loki.write "wp" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

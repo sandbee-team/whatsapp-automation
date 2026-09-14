@@ -1,0 +1,36 @@
+---
+title: Data Processing Addendum
+description: Roles, data categories, security measures and retention terms for the data WP processes on your behalf.
+---
+
+## Roles
+
+You are the controller of your contacts, message content, and the data your workspace collects. WP is the processor, acting on your instructions to provide the messaging service.
+
+## Categories of data processed
+
+- Contacts
+- Message content
+- Delivery metadata
+- Opt-outs
+- Consent attestations
+
+## Security measures
+
+Session credentials are envelope-encrypted with purpose-separated keys held outside the database. Tenant isolation is enforced at the database row level. Backups are encrypted and stored off-site, using a passphrase kept separate from the credential keys. Restore drills are run to confirm those backups are actually recoverable.
+
+## Sub-processors
+
+{/* FOUNDER: list the hosting provider and backup storage provider here before the first paying tenant */}
+
+## Retention and deletion
+
+Message bodies are purged within 7 days of a deletion request. Audit records and opt-out tombstones are retained beyond that, for compliance and to honour opt-outs correctly.
+
+## Breach notification
+
+We notify you without undue delay, and no later than 72 hours after we confirm a breach affecting your data.
+
+## Carve-outs
+
+Retention beyond your instructions may apply where WP has a legal obligation to keep a record, or a legitimate interest in retaining audit and opt-out records to operate the service safely.

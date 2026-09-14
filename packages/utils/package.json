@@ -1,0 +1,16 @@
+{
+  "name": "@wp/utils",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "dependencies": {},
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "wp-source": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+groups:
+  - name: fixture-typo-metric
+    rules:
+      - alert: TypoMetric
+        expr: wp_instances_unowend > 0
+        labels:
+          severity: page
+        annotations:
+          summary: 'fixture: typo metric name'
+          description: 'fixture only - never a real alert'
+          runbook_url: docs/RUNBOOK.md#alert-instances-unowned

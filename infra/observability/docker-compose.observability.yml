@@ -1,0 +1,103 @@
+name: wp-observability
+
+# P25 Unit U4 (steps 5-7) - the observability stack: Prometheus (metrics +
+# alert evaluation), Alertmanager (routing), Grafana (dashboards, provisioned
+# from `grafana/dashboards/*.json` - owned by unit U6), Loki + Alloy (log
+# pipeline), and a redis_exporter for redis-sig. Every port is
+# loopback-published (`${OBS_BIND:-127.0.0.1}`) - this stack is never exposed
+# beyond the host it runs on. See `README.md` in this directory for the
+# start/stop/secrets contract.
+#
+# Image tags are pinned exactly (never `latest`) - verified against the
+# registry manifest the day this file was written; bumping any of them is a
+# deliberate, reviewed change, not a side effect of a `docker compose pull`.
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    restart: unless-stopped
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    ports:
+      - '${OBS_BIND:-127.0.0.1}:9090:9090'
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/targets:/etc/prometheus/targets:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.0
+    restart: unless-stopped
+    ports:
+      - '${OBS_BIND:-127.0.0.1}:9093:9093'
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ${WP_SECRETS_DIR:-./secrets.example}:/etc/wp/secrets:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+
+  grafana:
+    image: grafana/grafana:13.2.1
+    restart: unless-stopped
+    ports:
+      - '${OBS_BIND:-127.0.0.1}:3001:3000'
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /etc/wp/secrets/grafana-admin-password
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ${WP_SECRETS_DIR:-./secrets.example}:/etc/wp/secrets:ro
+      - grafana_data:/var/lib/grafana
+
+  loki:
+    image: grafana/loki:3.7.7
+    restart: unless-stopped
+    ports:
+      - '${OBS_BIND:-127.0.0.1}:3100:3100'
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+    command:
+      - '-config.file=/etc/loki/loki-config.yml'
+
+  alloy:
+    image: grafana/alloy:v1.19.2
+    restart: unless-stopped
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    ports:
+      - '${OBS_BIND:-127.0.0.1}:12345:12345'
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy_data:/var/lib/alloy
+    command:
+      - 'run'
+      - '--server.http.listen-addr=0.0.0.0:12345'
+      - '--storage.path=/var/lib/alloy'
+      - '/etc/alloy/config.alloy'
+
+  redis_exporter:
+    image: oliver006/redis_exporter:v1.90.0
+    restart: unless-stopped
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    ports:
+      - '${OBS_BIND:-127.0.0.1}:9121:9121'
+    environment:
+      REDIS_ADDR: ${REDIS_SIG_ADDR:-redis://host.docker.internal:6380}
+
+volumes:
+  prometheus_data:
+  alertmanager_data:
+  grafana_data:
+  loki_data:
+  alloy_data:

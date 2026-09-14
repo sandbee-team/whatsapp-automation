@@ -1,0 +1,21 @@
+{
+  "extends": "../../packages/config/tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "types": ["node"]
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../../packages/server-kit" },
+    { "path": "../../db" },
+    { "path": "../../packages/domain" },
+    { "path": "../../packages/contracts" },
+    { "path": "../../packages/utils" },
+    { "path": "../../scripts/chaos" },
+    { "path": "../../scripts/measure" },
+    { "path": "../../scripts/ops" },
+    { "path": "../../scripts/loadtest" }
+  ]
+}

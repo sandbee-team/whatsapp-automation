@@ -1,0 +1,18 @@
+[
+  {
+    "targets": ["host.docker.internal:9464"],
+    "labels": { "role": "api" }
+  },
+  {
+    "targets": ["host.docker.internal:9465"],
+    "labels": { "role": "session-worker" }
+  },
+  {
+    "targets": ["host.docker.internal:9466"],
+    "labels": { "role": "cron" }
+  },
+  {
+    "targets": ["host.docker.internal:9467"],
+    "labels": { "role": "relay" }
+  }
+]

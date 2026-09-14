@@ -1,0 +1,57 @@
+/*
+ * globals.css (P29 U2) - Tailwind v4 CSS-first entry point for website,
+ * mirroring app/frontend's `styles/tailwind.css` idiom. `@wp/design-tokens`
+ * supplies both the raw CSS custom properties (`tokens.css`) and the
+ * generated `@theme` mapping (`tailwind.css`). `@source` points Tailwind
+ * v4's content scanner at `@wp/ui`'s source so its utility classes are
+ * generated even though this file never imports those literal strings.
+ */
+@import 'tailwindcss';
+@import '@wp/design-tokens/tokens.css';
+@import '@wp/design-tokens/tailwind.css';
+@source '../../../packages/ui/src';
+
+html,
+body {
+  font-family: var(--font-ui);
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * hero-panel-fade-in (P29 step 6/U5 - LCP budget fallback escalation step 2)
+ * - replaces the gsap client-island animation on the home hero's decorative
+ * panel (never the h1) with a CSS-only fade so no motion-related JS ships
+ * on the home page at all. The reduced-motion rule above already collapses
+ * this to near-zero duration, so no separate opt-out is needed here.
+ */
+@keyframes hero-panel-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-panel-fade-in {
+  animation: hero-panel-fade-in 0.6s ease-out both;
+}

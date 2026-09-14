@@ -1,0 +1,42 @@
+{
+  // tsconfig.build.json (2026-09-14) - the PRODUCTION build of app/backend,
+  // used only by the Docker image (`tsc -p app/backend/tsconfig.build.json`).
+  //
+  // Why a second config instead of building tsconfig.json:
+  // `tsconfig.json` compiles the whole of `src`, which includes the
+  // measurement/fleet harnesses under `engine/measure/**` plus a handful of
+  // `*-test-support.ts` / `*-test-fixtures.ts` files. Those are NOT tests, but
+  // they import from `__tests__/` and `__test-support__/` - so building them
+  // would force the image to ship the entire test tree, which `.dockerignore`
+  // deliberately excludes. `tsc` then fails with TS2307 on every such import.
+  //
+  // Excluding them is safe, and that was verified rather than assumed: walking
+  // the real import graph of all five ROLE entrypoints (api, session-worker,
+  // cron, relay, migrate) reaches 995 module paths in total and ZERO of them
+  // is a measurement or test-support module. Nothing a running role executes
+  // is dropped here.
+  //
+  // `composite: false` + `incremental: false`: this config is a leaf build for
+  // one image layer, never a referenced project, and it must not fight
+  // tsconfig.json over the same .tsbuildinfo.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "incremental": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "tsBuildInfoFile": null
+  },
+  "include": ["src"],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**",
+    "src/**/__test-support__/**",
+    "src/engine/measure/**",
+    "src/**/*-test-support.ts",
+    "src/**/*-test-fixtures.ts",
+    "src/**/synthetic-fleet-support.ts"
+  ]
+}

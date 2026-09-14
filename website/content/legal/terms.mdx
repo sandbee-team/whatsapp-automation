@@ -1,0 +1,80 @@
+---
+title: Terms of Service
+description: The terms that govern your use of WP, in plain language, including what WP tells you about restriction risk and data retention.
+---
+
+## 1. Parties and acceptance
+
+These terms are between you (the workspace owner) and WP (the operator named on your invoice). By creating a workspace or using WP, you accept these terms.
+
+{/* FOUNDER: fill legal entity, registered address and governing jurisdiction before the first paying tenant */}
+
+## 2. What WP is
+
+WP is a linked-device WhatsApp messaging service. It connects to your WhatsApp account as a linked device, in the same way WhatsApp Web or WhatsApp Desktop does, and helps you queue, pace and track messages sent from your own number.
+
+## 3. Data retention defaults
+
+| Data                           | Retention                             |
+| ------------------------------ | ------------------------------------- |
+| Message jobs and send attempts | 13 months                             |
+| Delivery events                | 90 days                               |
+| Audit logs                     | 24 months minimum, never auto-deleted |
+| Login sessions                 | 30 days past expiry                   |
+| Webhook delivery records       | 30 days                               |
+| Number health samples          | 90 days                               |
+| Opt-outs and consent records   | For the life of the workspace         |
+| WhatsApp session credentials   | Until you unlink or log out           |
+
+These are WP-set defaults and are not yet tenant-configurable.
+
+## 4. What we tell you in plain language
+
+1. WP connects as a linked device to your WhatsApp account. The account, the number, and its standing with WhatsApp are yours.
+2. WhatsApp may restrict or ban any account. WP's pacing controls reduce the risk of triggering spam or rate-limit signals from sending too fast or too cold; they cannot prevent or guarantee against WhatsApp restrictions. Bans also come from recipient reports, content, and account reputation — none of which sender-side pacing controls.
+3. You are responsible for having permission to message every recipient. You attest to this on import.
+4. If WhatsApp signals a restriction, WP stops sending on that number, keeps your queued messages, and tells you. WP will not automatically resume, will not switch you to another number, and will not attempt to work around the restriction.
+5. WP is a linked device, so WP's servers process your message content in the clear. WhatsApp's end-to-end encryption protects messages between devices; it does not and cannot hide content from a linked device you authorised.
+6. Your data retention defaults are listed above. Changing them, exporting your data, or deleting your workspace is done by request to WP support in this release; self-service export and deletion are planned and this sentence will change when they ship.
+
+## 5. Restriction risk
+
+Connecting your WhatsApp number to WP links that number to this workspace for sending. WhatsApp may restrict or ban a number for any reason it determines, and WP has no appeal path for a WhatsApp-side restriction — we cannot get a number un-banned or reviewed on your behalf. Safe Mode only reduces the sender-side velocity risk (sending too fast or too cold); it has no effect on restrictions caused by recipient reports, message content or account reputation.
+
+Linking a number to WP puts an unappealable restriction risk on your real number. Safe Mode reduces the risk of sender-side velocity signals; it cannot prevent restrictions, and recipient reports and content dominate.
+
+Safe Mode paces your sending and watches your account's real signals. It reduces the risk of triggering spam or rate-limit signals from sending too fast or too cold. It cannot prevent or guarantee against WhatsApp restrictions — bans also come from recipient reports, message content and account reputation, which no sender-side pacing can control.
+
+## 6. Sending features
+
+What "Broadcast" means in WP. WhatsApp's own broadcast lists have a limitation most people discover the hard way: a broadcast-list message is only delivered to recipients who have already saved your number in their phone. Everyone else silently receives nothing. WP does not use broadcast lists. When you send a WP Broadcast, we create one individually-addressed message per recipient — the same thing as if you had opened each chat and typed it yourself — and we send them one at a time, paced, from your connected number. That is why a broadcast to 2,000 people takes hours or days rather than seconds: the pacing is the product. It also means each recipient sees a normal one-to-one message from you, can reply to it, and their reply lands in your Inbox. A Broadcast is not a licence to exceed your account's daily cap — it simply takes as long as your cap allows, and the panel shows you the honest estimated finish time before you start.
+
+Sending promotional messages into WhatsApp groups is one of the highest report-rate behaviours on the platform. A single annoyed member can report the message, and group reports are visible to WhatsApp in a way one-to-one messages are not. WP caps group sending, disables it during warm-up, and switches it off first when your account's health signals worsen — but a group blast is riskier than the same message sent one-to-one, and no pacing changes that.
+
+Parked — not connected. This number is not receiving messages while parked. Messages people send you during this time may not appear after you reconnect. Queued messages are safe and will send when you reconnect.
+
+WhatsApp's server-side buffer for an offline linked device is neither documented nor unlimited — we don't know how much is retained or for how long.
+
+## 7. Ambiguous sends
+
+If WP cannot determine whether a message was delivered (for example after a crash or disconnect mid-send), it does not resend the message. It is held for your review and you decide whether to retry or discard it; it is not charged until it is confirmed sent.
+
+## 8. Wallet and charges
+
+Once WhatsApp has acknowledged a message, it is charged and not refunded — even if it is later unread, the recipient has blocked you, or the number turns out not to be on WhatsApp. WhatsApp gives no reliable after-acknowledgement undeliverable signal, and we will not pretend otherwise. Top-ups are manual, submitted by UPI or bank transfer with a transaction reference, and approved by a person at WP. A staff credit issued for a platform error is a goodwill adjustment, and it carries its own audit record.
+
+## 9. Consent and opt-out
+
+You attest that you have permission to message every recipient at the time you import them. WP records who attested and when, and cannot independently verify the claim. An inbound STOP, UNSUBSCRIBE, BAND KARO, ROKO, or any keyword you have configured, opts that recipient out and cancels their queued messages.
+
+## 10. Acceptable use
+
+You may not use WP to message anyone without permission, to send content WhatsApp forbids, or to attempt to evade a WhatsApp restriction. WP has no such evasion feature and will not build one.
+
+## 11. Availability and liability
+
+WP is provided as-is. We work to keep it available and reliable, but we make no uptime commitment in these terms, and our liability is limited as set out in your commercial agreement.
+
+## 12. Changes
+
+These terms are dated. This version is dated 2026-09-08. When you accept these terms in the onboarding consent step, WP records the version date you accepted on your workspace. When they change, we publish the new date here and announce material changes to workspace owners before they take effect.

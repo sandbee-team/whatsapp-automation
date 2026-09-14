@@ -1,0 +1,29 @@
+---
+title: How sending is paced
+description: What a durable job is, warm-up tiers and daily caps, the sending window, and why priority orders work rather than promising speed.
+order: 1
+---
+
+Every message you send through WP starts the same way: it is stored as a durable job before anything is attempted. If the process restarts, if a connection drops, if a worker crashes mid-send — the job is still there. Nothing you queue is lost to a crash or a restart.
+
+## Warm-up and daily caps
+
+A newly connected number does not start at full volume. It moves through warm-up tiers, and each tier raises the number's daily cap a little further as its health signals stay good. This is not a promise about how fast a number can send — it is a description of how the cap grows over time.
+
+## The sending window
+
+Sending happens inside a local sending window (08:00–20:00 by default, in the timezone configured for each number). Messages queued outside that window wait until it opens rather than sending at an unusual hour.
+
+## The frequency guard is per workspace
+
+Sending the same audience from another number does not increase how often a person can be messaged — the frequency limit is per workspace.
+
+## Deferral is not failure
+
+If a message cannot be sent today — because the day's cap is reached, or the sending window has closed — it is not marked as failed. It stays queued and is picked up again the next day.
+
+## Priority orders work, it does not promise speed
+
+You can mark some messages as higher priority than others. That changes the order in which the queue works through what is waiting — it does not change how fast any individual message is delivered, and it is not a guarantee of delivery time.
+
+Safe Mode paces your sending and watches your account's real signals. It reduces the risk of triggering spam or rate-limit signals from sending too fast or too cold. It cannot prevent or guarantee against WhatsApp restrictions — bans also come from recipient reports, message content and account reputation, which no sender-side pacing can control.

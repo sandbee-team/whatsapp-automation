@@ -1,0 +1,234 @@
+{
+  "uid": "wp-send-path",
+  "title": "WP send path",
+  "tags": ["wp"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Send attempts by result",
+      "description": "Send attempts, grouped by outcome. Runbook: docs/RUNBOOK.md#send-path.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (result) (rate(wp_send_attempts_total[5m]))",
+          "legendFormat": "{{result}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Send errors by class",
+      "description": "Failed send attempts, grouped by classified error class. Runbook: docs/RUNBOOK.md#send-path.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (error_class) (rate(wp_send_errors_total[5m]))",
+          "legendFormat": "{{error_class}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Honesty counters",
+      "description": "Claim races, unresolved jobs, ambiguous reconciles, echo capture failures, and reaper repair outcomes - the durable-first/idempotency tripwires. Runbook: docs/RUNBOOK.md#send-path.",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "rate(wp_claim_lost_total[5m])", "legendFormat": "claim lost" },
+        {
+          "refId": "B",
+          "expr": "rate(wp_unresolved_jobs_total[5m])",
+          "legendFormat": "unresolved jobs"
+        },
+        {
+          "refId": "C",
+          "expr": "rate(wp_reconcile_ambiguous_total[5m])",
+          "legendFormat": "reconcile ambiguous"
+        },
+        {
+          "refId": "D",
+          "expr": "rate(wp_echo_capture_failed_total[5m])",
+          "legendFormat": "echo capture failed"
+        },
+        {
+          "refId": "E",
+          "expr": "sum by (result) (rate(wp_reaper_repairs_total[5m]))",
+          "legendFormat": "reaper {{result}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Unresolved rate (1d)",
+      "description": "Jobs moved to needs_reconcile divided by total send attempts over the trailing day. Threshold 0.001. Runbook: docs/RUNBOOK.md#send-path.",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(wp_unresolved_jobs_total[1d])) / clamp_min(sum(increase(wp_send_attempts_total[1d])), 1)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.001 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Queue depth and oldest queued age",
+      "description": "Fleet-wide queued job count and oldest queued job age in seconds. Threshold line 60s (queue-lag SLO). Runbook: docs/RUNBOOK.md#send-path.",
+      "gridPos": { "h": 8, "w": 16, "x": 8, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "max(wp_queue_depth_total)", "legendFormat": "queue depth" },
+        {
+          "refId": "B",
+          "expr": "max(wp_oldest_queued_seconds_max)",
+          "legendFormat": "oldest queued (s)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 60 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Jobs needing reconcile or review",
+      "description": "Fleet-wide message_jobs counts in needs_reconcile and blocked_needs_review. Runbook: docs/RUNBOOK.md#send-path.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "max(wp_jobs_needs_reconcile)", "legendFormat": "needs reconcile" },
+        {
+          "refId": "B",
+          "expr": "max(wp_jobs_blocked_needs_review)",
+          "legendFormat": "blocked needs review"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Messages out without a job",
+      "description": "Outbound provider message ids with neither a message_jobs row nor echo evidence - invariant 1 (durable-first) tripwire, must be 0. Runbook: docs/RUNBOOK.md#alert-messages-out-without-job.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "max(wp_messages_out_without_job)" }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Send duration p95",
+      "description": "p95 wall time from dispatch start to result resolution, per attempt. Runbook: docs/RUNBOOK.md#send-path.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(wp_send_duration_seconds_bucket[5m])))"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Send-loop iteration errors by reason",
+      "description": "Send-loop iterations whose runOneIteration call rejected, by the rejecting error name. Runbook: docs/RUNBOOK.md#send-path.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (reason) (rate(wp_send_loop_iteration_errors_total[5m]))",
+          "legendFormat": "{{reason}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Safety-poll claims vs wake received",
+      "description": "Claim attempts triggered by the mandatory safety-poll timer against wake pub/sub messages actually received - a healthy fleet is mostly wake-driven. Runbook: docs/RUNBOOK.md#send-path.",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 40 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(wp_safety_poll_claims_total[5m])",
+          "legendFormat": "safety-poll claims"
+        },
+        {
+          "refId": "B",
+          "expr": "rate(wp_wake_received_total[5m])",
+          "legendFormat": "wake received"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": {}
+    }
+  ]
+}

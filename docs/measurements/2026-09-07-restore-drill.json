@@ -1,0 +1,545 @@
+{
+  "schemaVersion": 1,
+  "kind": "restore-drill",
+  "capturedAtIso": "2026-09-07T13:35:20.410Z",
+  "source": {
+    "host": "127.0.0.1:55432",
+    "database": "wp",
+    "schemaVersion": 69
+  },
+  "backup": {
+    "tool": "pg_dump",
+    "format": "custom",
+    "compression": "none",
+    "bytes": 232166650,
+    "tookMs": 4249,
+    "path": "C:\\Users\\KARTIK~1.DES\\AppData\\Local\\Temp\\wp-restore-drill-20260907-190511.dump"
+  },
+  "restore": {
+    "tool": "pg_restore",
+    "target": {
+      "host": "127.0.0.1:55432",
+      "database": "wp_restore_drill_20260907-190511"
+    },
+    "tookMs": 4377,
+    "dataSizeBytes": 1036261043,
+    "restoredDataSizeBytes": 312948403
+  },
+  "verification": {
+    "schemaVersion": {
+      "expected": 69,
+      "actual": 69,
+      "ok": true
+    },
+    "tables": [
+      {
+        "name": "audit_logs",
+        "sourceRows": 3831,
+        "restoredRows": 3831
+      },
+      {
+        "name": "audit_logs_y2026m08",
+        "sourceRows": 76,
+        "restoredRows": 76
+      },
+      {
+        "name": "audit_logs_y2026m09",
+        "sourceRows": 3755,
+        "restoredRows": 3755
+      },
+      {
+        "name": "audit_logs_y2026m10",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "audit_logs_y2026m11",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "audit_logs_y2032m01",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "audit_logs_y2032m02",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "audit_logs_y2032m03",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "audit_logs_y2032m06",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "audit_logs_y2032m07",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "audit_logs_y2032m08",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "auth_sessions",
+        "sourceRows": 97,
+        "restoredRows": 97
+      },
+      {
+        "name": "campaign_counters",
+        "sourceRows": 6,
+        "restoredRows": 6
+      },
+      {
+        "name": "campaign_recipients",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "campaigns",
+        "sourceRows": 6,
+        "restoredRows": 6
+      },
+      {
+        "name": "client_daily_usage",
+        "sourceRows": 4,
+        "restoredRows": 4
+      },
+      {
+        "name": "client_limit_overrides",
+        "sourceRows": 1,
+        "restoredRows": 1
+      },
+      {
+        "name": "client_pricing",
+        "sourceRows": 66,
+        "restoredRows": 66
+      },
+      {
+        "name": "clients",
+        "sourceRows": 1152,
+        "restoredRows": 1152
+      },
+      {
+        "name": "consent_records",
+        "sourceRows": 2,
+        "restoredRows": 2
+      },
+      {
+        "name": "contact_import_errors",
+        "sourceRows": 2,
+        "restoredRows": 2
+      },
+      {
+        "name": "contact_imports",
+        "sourceRows": 2,
+        "restoredRows": 2
+      },
+      {
+        "name": "contact_tag_links",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "contact_tags",
+        "sourceRows": 1,
+        "restoredRows": 1
+      },
+      {
+        "name": "contacts",
+        "sourceRows": 60002,
+        "restoredRows": 60002
+      },
+      {
+        "name": "content_fingerprint_recipients",
+        "sourceRows": 27,
+        "restoredRows": 27
+      },
+      {
+        "name": "content_fingerprints",
+        "sourceRows": 17,
+        "restoredRows": 17
+      },
+      {
+        "name": "delivery_event_ids",
+        "sourceRows": 7433,
+        "restoredRows": 7433
+      },
+      {
+        "name": "delivery_events",
+        "sourceRows": 11216,
+        "restoredRows": 11216
+      },
+      {
+        "name": "delivery_events_y2026w35",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "delivery_events_y2026w36",
+        "sourceRows": 3789,
+        "restoredRows": 3789
+      },
+      {
+        "name": "delivery_events_y2026w37",
+        "sourceRows": 7427,
+        "restoredRows": 7427
+      },
+      {
+        "name": "delivery_events_y2026w38",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "delivery_events_y2026w39",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "email_verification_tokens",
+        "sourceRows": 55,
+        "restoredRows": 55
+      },
+      {
+        "name": "inbound_dead_letters",
+        "sourceRows": 1,
+        "restoredRows": 1
+      },
+      {
+        "name": "instance_health_samples",
+        "sourceRows": 678,
+        "restoredRows": 678
+      },
+      {
+        "name": "instance_lease_state",
+        "sourceRows": 3085,
+        "restoredRows": 3085
+      },
+      {
+        "name": "instance_pacing_overrides",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "instance_pacing_state",
+        "sourceRows": 2025,
+        "restoredRows": 2025
+      },
+      {
+        "name": "instance_recipient_contacts",
+        "sourceRows": 8,
+        "restoredRows": 8
+      },
+      {
+        "name": "memberships",
+        "sourceRows": 55,
+        "restoredRows": 55
+      },
+      {
+        "name": "message_job_refs",
+        "sourceRows": 303791,
+        "restoredRows": 303791
+      },
+      {
+        "name": "message_jobs",
+        "sourceRows": 303795,
+        "restoredRows": 303795
+      },
+      {
+        "name": "message_jobs_y2026m08",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "message_jobs_y2026m09",
+        "sourceRows": 243795,
+        "restoredRows": 243795
+      },
+      {
+        "name": "message_jobs_y2026m10",
+        "sourceRows": 40000,
+        "restoredRows": 40000
+      },
+      {
+        "name": "message_jobs_y2026m11",
+        "sourceRows": 20000,
+        "restoredRows": 20000
+      },
+      {
+        "name": "message_wa_ids",
+        "sourceRows": 3713,
+        "restoredRows": 3713
+      },
+      {
+        "name": "mfa_recovery_codes",
+        "sourceRows": 460,
+        "restoredRows": 460
+      },
+      {
+        "name": "notifications",
+        "sourceRows": 393,
+        "restoredRows": 393
+      },
+      {
+        "name": "opt_outs",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "optout_confirmations",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "outbox_events",
+        "sourceRows": 30,
+        "restoredRows": 30
+      },
+      {
+        "name": "pacing_events",
+        "sourceRows": 5,
+        "restoredRows": 5
+      },
+      {
+        "name": "pacing_ledger",
+        "sourceRows": 1000,
+        "restoredRows": 1000
+      },
+      {
+        "name": "pacing_profiles",
+        "sourceRows": 3,
+        "restoredRows": 3
+      },
+      {
+        "name": "pacing_warmup_tiers",
+        "sourceRows": 18,
+        "restoredRows": 18
+      },
+      {
+        "name": "password_reset_tokens",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "plan_limits",
+        "sourceRows": 34,
+        "restoredRows": 34
+      },
+      {
+        "name": "plans",
+        "sourceRows": 34,
+        "restoredRows": 34
+      },
+      {
+        "name": "price_list_items",
+        "sourceRows": 4,
+        "restoredRows": 4
+      },
+      {
+        "name": "price_lists",
+        "sourceRows": 1,
+        "restoredRows": 1
+      },
+      {
+        "name": "recipient_send_buckets",
+        "sourceRows": 2,
+        "restoredRows": 2
+      },
+      {
+        "name": "schema_migrations",
+        "sourceRows": 69,
+        "restoredRows": 69
+      },
+      {
+        "name": "send_attempts",
+        "sourceRows": 7155,
+        "restoredRows": 7155
+      },
+      {
+        "name": "staff_audit_log",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "tenant_blocked_words",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "tenant_optout_keywords",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "topup_requests",
+        "sourceRows": 185,
+        "restoredRows": 185
+      },
+      {
+        "name": "unresolved_action_keys",
+        "sourceRows": 305,
+        "restoredRows": 305
+      },
+      {
+        "name": "users",
+        "sourceRows": 1726,
+        "restoredRows": 1726
+      },
+      {
+        "name": "wa_groups",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "wallet_accounts",
+        "sourceRows": 75,
+        "restoredRows": 75
+      },
+      {
+        "name": "wallet_charge_guards",
+        "sourceRows": 3742,
+        "restoredRows": 3742
+      },
+      {
+        "name": "wallet_charge_guards_y2026m08",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "wallet_charge_guards_y2026m09",
+        "sourceRows": 3742,
+        "restoredRows": 3742
+      },
+      {
+        "name": "wallet_charge_guards_y2026m10",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "wallet_charge_guards_y2026m11",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "wallet_charge_guards_y2032m01",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "wallet_charge_guards_y2032m02",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "wallet_charge_guards_y2032m03",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "wallet_charge_guards_y2032m06",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "wallet_charge_guards_y2032m07",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "wallet_charge_guards_y2032m08",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "wallet_daily_summary",
+        "sourceRows": 1,
+        "restoredRows": 1
+      },
+      {
+        "name": "wallet_ledger",
+        "sourceRows": 4574,
+        "restoredRows": 4574
+      },
+      {
+        "name": "wallet_ledger_ext_refs",
+        "sourceRows": 1838,
+        "restoredRows": 1838
+      },
+      {
+        "name": "wallet_ledger_y2026m08",
+        "sourceRows": 14,
+        "restoredRows": 14
+      },
+      {
+        "name": "wallet_ledger_y2026m09",
+        "sourceRows": 4560,
+        "restoredRows": 4560
+      },
+      {
+        "name": "wallet_ledger_y2026m10",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "wallet_ledger_y2026m11",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "wallet_reconcile_findings",
+        "sourceRows": 7861,
+        "restoredRows": 7861
+      },
+      {
+        "name": "webhook_deliveries",
+        "sourceRows": 6,
+        "restoredRows": 6
+      },
+      {
+        "name": "webhook_endpoints",
+        "sourceRows": 0,
+        "restoredRows": 0
+      },
+      {
+        "name": "whatsapp_instances",
+        "sourceRows": 3137,
+        "restoredRows": 3137
+      },
+      {
+        "name": "whatsapp_session_credentials",
+        "sourceRows": 3078,
+        "restoredRows": 3078
+      },
+      {
+        "name": "whatsapp_session_keys",
+        "sourceRows": 0,
+        "restoredRows": 0
+      }
+    ],
+    "claimQuery": {
+      "rowsReturned": 1,
+      "ok": true,
+      "note": "ran as the superuser connection (RLS FORCEd but bypassed by superuser); claimed inside BEGIN...ROLLBACK, never committed"
+    },
+    "plaintextScan": {
+      "sentinels": ["noiseKey", "signedIdentityKey", "registrationId", "advSecretKey"],
+      "blobHits": 0,
+      "dumpFileHits": 0,
+      "ok": true
+    }
+  },
+  "adr0018Tier": {
+    "tier": "5000",
+    "claimedRto": "4-6 h at 10,000 from backup (5,000 band)"
+  },
+  "notes": [],
+  "verdict": "PASS",
+  "problems": []
+}

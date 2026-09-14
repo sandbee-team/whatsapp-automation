@@ -1,0 +1,27 @@
+# wp-slo.rules.yml (P25 Unit U4, step 6) - the design-doc SS4.1 SLO recording
+# rules. Every expression aggregates with max()/sum() before comparing,
+# never reading a single target's raw gauge/counter: several roles expose
+# the SAME fleet-wide gauge (for example every session-worker process binds
+# wp_instances_unowned; a role that merely wires the metric without owning
+# fleet state exposes it at 0), so comparing one target's copy directly
+# would silently pick whichever role happened to be scraped, not the true
+# fleet-wide value. Recording rules also let wp-alerts.rules.yml alert on a
+# stable name (wp:...) instead of repeating this aggregation in every alert.
+groups:
+  - name: wp-slo
+    interval: 1m
+    rules:
+      - record: wp:session_availability_ratio
+        expr: max(wp_instances_connected) / clamp_min(max(wp_instances_desired_online), 1)
+
+      - record: wp:queue_lag_p99_seconds
+        expr: max(quantile_over_time(0.99, wp_oldest_queued_seconds_max[5m]))
+
+      - record: wp:unresolved_rate_1d
+        expr: sum(increase(wp_unresolved_jobs_total[1d])) / clamp_min(sum(increase(wp_send_attempts_total[1d])), 1)
+
+      - record: wp:fleet_headroom_ratio
+        expr: max(wp_fleet_capacity_headroom) / clamp_min(max(wp_fleet_capacity_headroom) + max(wp_instances_desired_online), 1)
+
+      - record: wp:send_error_ratio_1h
+        expr: sum(increase(wp_send_errors_total[1h])) / clamp_min(sum(increase(wp_send_attempts_total[1h])), 1)

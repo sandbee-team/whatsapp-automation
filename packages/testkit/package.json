@@ -1,0 +1,14 @@
+{
+  "name": "@wp/testkit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "dependencies": {
+    "@wp/db": "workspace:*",
+    "@wp/domain": "workspace:*",
+    "@wp/contracts": "workspace:*",
+    "@wp/utils": "workspace:*"
+  }
+}

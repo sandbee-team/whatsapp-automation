@@ -1,0 +1,24 @@
+---
+title: What Safe Mode does and does not do
+description: An honest list of what Safe Mode covers and what it cannot cover, so you know exactly where the responsibility sits.
+order: 2
+---
+
+Safe Mode paces your sending and watches your account's real signals. It reduces the risk of triggering spam or rate-limit signals from sending too fast or too cold. It cannot prevent or guarantee against WhatsApp restrictions — bans also come from recipient reports, message content and account reputation, which no sender-side pacing can control.
+
+## What Safe Mode does
+
+- Paces your sending, so a number is never pushed faster than its current tier allows.
+- Watches the number's real signals continuously, not just at send time.
+- Runs a warm-up ramp for new numbers instead of starting them at full volume.
+- Stops sending on a number the moment WhatsApp signals a restriction.
+- Keeps every queued message when it stops — nothing queued is discarded.
+- Tells you what happened, both on the dashboard and through a webhook if you have one configured.
+
+## What Safe Mode does not do
+
+- It does not prevent or guarantee against WhatsApp restrictions.
+- It does not resume sending by itself after a restriction — that decision is yours.
+- It does not switch you to another number.
+- It does not work around a restriction in any way; WP has no such feature and will not build one.
+- It does not control recipient reports, your message content, or your account's reputation — those are outside what any sender-side pacing can touch.

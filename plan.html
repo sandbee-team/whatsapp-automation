@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WhatsApp SaaS — Queue & Failure Recovery Architecture</title>
+<style>
+:root{
+  --bg:#0b1020; --panel:#11182b; --panel2:#17213a; --text:#eaf0ff;
+  --muted:#9eabc8; --line:#2a385b; --blue:#63a4ff; --green:#4ade80;
+  --yellow:#facc15; --red:#fb7185; --purple:#b38cff; --cyan:#5eead4;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:linear-gradient(180deg,#080d19,#0d1426);color:var(--text)}
+.container{max-width:1250px;margin:auto;padding:32px 22px 70px}
+header{padding:30px 0 20px}
+.badge{display:inline-block;padding:7px 12px;border:1px solid #33456e;border-radius:999px;color:#a9c8ff;background:#111b31;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+h1{font-size:38px;margin:16px 0 10px;line-height:1.1}
+h2{font-size:24px;margin:0 0 16px}
+h3{font-size:16px;margin:0 0 9px}
+p{color:var(--muted);line-height:1.65}
+.hero{font-size:17px;max-width:900px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.card,.section{background:rgba(17,24,43,.88);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 10px 35px rgba(0,0,0,.16)}
+.section{margin-top:20px}
+.kpi{font-size:30px;font-weight:800;margin:4px 0}
+.small{font-size:13px;color:var(--muted)}
+.flow{display:flex;align-items:center;justify-content:center;gap:9px;flex-wrap:wrap;margin:20px 0}
+.node{padding:13px 16px;border:1px solid #3a4d79;border-radius:12px;background:#121c33;text-align:center;min-width:130px}
+.node strong{display:block}
+.arrow{color:var(--blue);font-size:22px}
+.status{display:inline-block;padding:5px 9px;border-radius:999px;font-size:11px;font-weight:700;margin-top:7px}
+.connected{background:#123522;color:var(--green)} .paused{background:#3c3110;color:var(--yellow)}
+.error{background:#411522;color:var(--red)} .degraded{background:#30205a;color:var(--purple)}
+table{width:100%;border-collapse:collapse;margin-top:10px}
+th,td{text-align:left;padding:12px;border-bottom:1px solid var(--line);font-size:14px}
+th{color:#c8d5f3;background:#151f37}
+td{color:#aebbd5}
+code{font-family:Consolas,monospace;color:#b8d4ff}
+pre{background:#090e1b;border:1px solid var(--line);padding:18px;border-radius:13px;overflow:auto;color:#c8d8f7;line-height:1.55}
+.timeline{display:grid;gap:10px}
+.step{display:grid;grid-template-columns:38px 1fr;gap:12px;align-items:start}
+.num{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:#183052;color:#9bc5ff;font-weight:800}
+.alert{border-left:4px solid var(--yellow);background:#201c0d;padding:15px 17px;border-radius:10px;color:#d9d1ad}
+.good{border-left:4px solid var(--green);background:#0d2117;padding:15px 17px;border-radius:10px;color:#b8d8c1}
+.bad{border-left:4px solid var(--red);background:#250f15;padding:15px 17px;border-radius:10px;color:#e4b8c0}
+.priority{display:grid;grid-template-columns:110px 1fr 100px;gap:10px;align-items:center;margin:9px 0}
+.bar{height:11px;background:#263451;border-radius:99px;overflow:hidden}.fill{height:100%;border-radius:99px}
+.high{width:90%;background:#fb7185}.normal{width:55%;background:#63a4ff}.low{width:25%;background:#8b9bbd}
+footer{margin-top:28px;color:#7382a3;font-size:12px;text-align:center}
+@media(max-width:800px){.grid,.grid2{grid-template-columns:1fr}h1{font-size:30px}.priority{grid-template-columns:80px 1fr 70px}}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+  <span class="badge">Architecture / Product Explanation</span>
+  <h1>WhatsApp SaaS — Reliable Queue & Failure Recovery Architecture</h1>
+  <p class="hero">A presentation-ready architecture for managing multiple clients, WhatsApp instances, prioritized message queues, controlled pacing, retries, account health, and safe pause/resume behavior.</p>
+</header>
+
+<section class="grid">
+  <div class="card"><div class="small">Clients</div><div class="kpi">100+</div><p>Each client can have an independent WhatsApp instance and queue.</p></div>
+  <div class="card"><div class="small">Queued messages</div><div class="kpi">10,000+</div><p>Messages remain durable while workers process them gradually.</p></div>
+  <div class="card"><div class="small">Core principle</div><div class="kpi">Fail Safe</div><p>When an account becomes unavailable, sending pauses instead of endlessly retrying.</p></div>
+</section>
+
+<section class="section">
+<h2>1. End-to-End Architecture</h2>
+<div class="flow">
+  <div class="node"><strong>Client / Dashboard</strong><span class="small">Create campaign</span></div><div class="arrow">→</div>
+  <div class="node"><strong>API</strong><span class="small">Validate request</span></div><div class="arrow">→</div>
+  <div class="node"><strong>Message Queue</strong><span class="small">Durable jobs</span></div><div class="arrow">→</div>
+  <div class="node"><strong>Scheduler</strong><span class="small">Priority + pacing</span></div><div class="arrow">→</div>
+  <div class="node"><strong>WhatsApp Worker</strong><span class="small">One account at a time</span></div><div class="arrow">→</div>
+  <div class="node"><strong>WhatsApp Provider</strong><span class="small">Send / receive</span></div>
+</div>
+<div class="good"><strong>Key idea:</strong> API requests should not directly perform thousands of sends. The API creates durable jobs; workers process those jobs under account-level controls.</div>
+</section>
+
+<section class="section">
+<h2>2. Multi-Client / Multi-Account Isolation</h2>
+<div class="grid2">
+<div>
+<pre>Client A
+  └── WA-A
+      ├── Queue
+      ├── Rate/Pacing Controller
+      ├── Worker
+      └── Health State
+
+Client B
+  └── WA-B
+      ├── Queue
+      ├── Rate/Pacing Controller
+      ├── Worker
+      └── Health State
+
+Client C
+  └── WA-C
+      └── ...</pre>
+</div>
+<div>
+<p><strong>Why isolate queues?</strong></p>
+<ul>
+<li>One client's campaign should not block another client's messages.</li>
+<li>Account health is tracked independently.</li>
+<li>Pause/resume can happen per WhatsApp instance.</li>
+<li>Scaling workers becomes easier.</li>
+</ul>
+<p><strong>Suggested infrastructure:</strong> PostgreSQL for durable business/message state, Redis for fast queueing/locks/rate state, and stateless API/worker services.</p>
+</div>
+</div>
+</section>
+
+<section class="section">
+<h2>3. Priority Queue</h2>
+<p>Priority controls which eligible job gets processed first. It should not be treated as a promise of a specific delivery speed.</p>
+<div class="priority"><strong>HIGH</strong><div class="bar"><div class="fill high"></div></div><span>Preferred</span></div>
+<div class="priority"><strong>NORMAL</strong><div class="bar"><div class="fill normal"></div></div><span>Balanced</span></div>
+<div class="priority"><strong>LOW</strong><div class="bar"><div class="fill low"></div></div><span>Background</span></div>
+<p class="small">Use weighted/fair scheduling so a continuous HIGH stream cannot starve NORMAL or LOW jobs forever.</p>
+</section>
+
+<section class="section">
+<h2>4. Controlled Pacing Per Account</h2>
+<div class="flow">
+  <div class="node"><strong>Next job</strong><span class="small">Eligible?</span></div><div class="arrow">→</div>
+  <div class="node"><strong>Account limiter</strong><span class="small">Concurrency + pacing</span></div><div class="arrow">→</div>
+  <div class="node"><strong>Send</strong><span class="small">Provider API</span></div><div class="arrow">→</div>
+  <div class="node"><strong>Record result</strong><span class="small">DB + events</span></div>
+</div>
+<table>
+<tr><th>Priority</th><th>Illustrative pacing policy</th><th>Purpose</th></tr>
+<tr><td>HIGH</td><td>Short configurable interval</td><td>Time-sensitive jobs</td></tr>
+<tr><td>NORMAL</td><td>Moderate configurable interval</td><td>Default traffic</td></tr>
+<tr><td>LOW</td><td>Longer configurable interval</td><td>Background traffic</td></tr>
+</table>
+<div class="alert"><strong>Important:</strong> A 1-second delay is only a software pacing example, not a guarantee that an account will avoid restrictions. Provider policies, recipient behavior, message content, quality signals, and other factors can matter.</div>
+</section>
+
+<section class="section">
+<h2>5. Message Lifecycle</h2>
+<div class="timeline">
+<div class="step"><div class="num">1</div><div><strong>CREATED</strong><p>Client submits a message/campaign. API validates it and creates a durable job.</p></div></div>
+<div class="step"><div class="num">2</div><div><strong>QUEUED</strong><p>Job waits in the account's queue with priority and scheduling metadata.</p></div></div>
+<div class="step"><div class="num">3</div><div><strong>PROCESSING</strong><p>Worker claims the job using a lock/idempotency mechanism.</p></div></div>
+<div class="step"><div class="num">4</div><div><strong>SENT / FAILED</strong><p>Provider response is stored. Successful jobs become SENT; retryable failures return to the queue.</p></div></div>
+<div class="step"><div class="num">5</div><div><strong>FINAL</strong><p>After successful delivery or a non-retryable failure, the job stops being retried.</p></div></div>
+</div>
+</section>
+
+<section class="section">
+<h2>6. Failure & Retry Matrix</h2>
+<table>
+<tr><th>Event</th><th>System action</th><th>Queue behavior</th></tr>
+<tr><td>Temporary network error</td><td>Retry with exponential backoff + jitter</td><td>Job remains pending</td></tr>
+<tr><td>Timeout</td><td>Retry within configured limit</td><td>Job remains pending</td></tr>
+<tr><td>Connection lost</td><td>Reconnect / mark degraded</td><td>New sends wait until eligible</td></tr>
+<tr><td>Logged out</td><td>Stop sending + notify user</td><td>Pending jobs preserved</td></tr>
+<tr><td>Restriction / provider block signal</td><td>Pause account + alert</td><td>No automatic repeated sending</td></tr>
+<tr><td>Permanent validation error</td><td>Mark failed</td><td>Do not retry</td></tr>
+</table>
+</section>
+
+<section class="section">
+<h2>7. Restriction / Account Failure Recovery</h2>
+<div class="flow">
+<div class="node"><strong>Sending</strong><span class="status connected">CONNECTED</span></div>
+<div class="arrow">→</div>
+<div class="node"><strong>Failure signal</strong><span class="status error">ERROR</span></div>
+<div class="arrow">→</div>
+<div class="node"><strong>Pause instance</strong><span class="status paused">PAUSED</span></div>
+<div class="arrow">→</div>
+<div class="node"><strong>User notification</strong><span class="small">Dashboard / webhook</span></div>
+</div>
+<pre>WA-A
+├── Sent:       600
+├── Processing:   0
+└── Queued:    1,399
+
+WA-A → PAUSED
+       ├── No new sends
+       ├── Existing jobs preserved
+       └── User notified
+
+After legitimate recovery:
+PAUSED → READY → QUEUED → PROCESSING → SENT</pre>
+<div class="bad"><strong>Do not design:</strong> automatic number rotation, fake identities, proxy tricks, or other mechanisms intended to evade a provider restriction. The safe design is to stop, preserve pending work, inform the user, and use the provider's legitimate recovery/appeal/reconnection path.</div>
+</section>
+
+<section class="section">
+<h2>8. Account Health State Machine</h2>
+<div class="flow">
+<div class="node">CONNECTED<br><span class="status connected">READY</span></div>
+<div class="arrow">→</div>
+<div class="node">DEGRADED<br><span class="status degraded">SLOW / UNSTABLE</span></div>
+<div class="arrow">→</div>
+<div class="node">PAUSED<br><span class="status paused">NO SENDS</span></div>
+<div class="arrow">→</div>
+<div class="node">LOGGED_OUT<br><span class="status error">USER ACTION</span></div>
+</div>
+<p>Every account gets its own health state. The dashboard can show queue depth, last successful send, recent errors, current state, and whether user action is required.</p>
+</section>
+
+<section class="section">
+<h2>9. Suggested Database Model</h2>
+<pre>clients
+  id, name, status, created_at
+
+whatsapp_instances
+  id, client_id, provider_account_id
+  status, health_state, last_error, last_success_at
+
+message_jobs
+  id, client_id, instance_id
+  recipient, payload
+  priority, status, scheduled_at
+  attempts, next_attempt_at
+  idempotency_key, created_at, sent_at
+
+delivery_events
+  id, message_job_id, event_type
+  provider_event_id, payload, created_at
+
+audit_logs
+  id, client_id, instance_id
+  action, metadata, created_at</pre>
+</section>
+
+<section class="section">
+<h2>10. Redis / Queue Responsibilities</h2>
+<div class="grid">
+<div class="card"><h3>Queue</h3><p>Store pending jobs and expose eligible jobs to workers.</p></div>
+<div class="card"><h3>Rate / pacing state</h3><p>Keep short-lived per-instance scheduling and concurrency state.</p></div>
+<div class="card"><h3>Locks</h3><p>Prevent two workers from processing the same job simultaneously.</p></div>
+</div>
+</section>
+
+<section class="section">
+<h2>11. Dashboard — What the User Sees</h2>
+<table>
+<tr><th>Account</th><th>Health</th><th>Queue</th><th>Current activity</th><th>Action</th></tr>
+<tr><td>WA-A</td><td><span class="status connected">CONNECTED</span></td><td>1,399</td><td>Sending</td><td>View</td></tr>
+<tr><td>WA-B</td><td><span class="status paused">PAUSED</span></td><td>2,450</td><td>Provider issue</td><td>Recover</td></tr>
+<tr><td>WA-C</td><td><span class="status degraded">DEGRADED</span></td><td>380</td><td>Waiting</td><td>View</td></tr>
+</table>
+<p>Recommended alert: <strong>“WhatsApp connection temporarily unavailable. Sending has been paused. Pending messages remain queued.”</strong></p>
+</section>
+
+<section class="section">
+<h2>12. Scaling Path</h2>
+<div class="flow">
+<div class="node">10 clients</div><div class="arrow">→</div>
+<div class="node">100 clients</div><div class="arrow">→</div>
+<div class="node">1,000 clients</div><div class="arrow">→</div>
+<div class="node">Horizontal workers</div>
+</div>
+<p>Keep API and workers stateless where possible. Add worker capacity horizontally, partition queue work by instance/tenant, monitor queue lag, and enforce tenant/account isolation.</p>
+</section>
+
+<section class="section">
+<h2>13. Final Architecture in One Picture</h2>
+<pre>
+┌──────────────────────┐
+│ Client / Dashboard   │
+└──────────┬───────────┘
+           │ API
+           ▼
+┌──────────────────────┐
+│ API / Validation     │
+└──────────┬───────────┘
+           │ create jobs
+           ▼
+┌──────────────────────────────────┐
+│ Durable Message Queue            │
+│ HIGH / NORMAL / LOW              │
+└──────────┬───────────────────────┘
+           │
+           ▼
+┌──────────────────────────────────┐
+│ Scheduler / Fair Priority        │
+│ scheduled_at + account pacing    │
+└──────────┬───────────────────────┘
+           │
+           ▼
+┌──────────────────────────────────┐
+│ WhatsApp Worker                  │
+│ per-instance concurrency/locks   │
+└──────────┬───────────────────────┘
+           │
+           ▼
+┌──────────────────────┐
+│ WhatsApp Provider    │
+└──────────┬───────────┘
+           │ result / webhook
+           ▼
+┌──────────────────────────────────┐
+│ PostgreSQL + Delivery Events     │
+└──────────────────────────────────┘
+
+Failure:
+Provider issue → detect → PAUSE INSTANCE → preserve queue → notify user
+                                     ↓
+                              legitimate recovery
+                                     ↓
+                                   RESUME
+</pre>
+</section>
+
+<section class="section">
+<h2>14. Recommended Product Positioning</h2>
+<div class="good"><strong>Reliable WhatsApp messaging infrastructure</strong> — controlled queues, priority scheduling, delivery tracking, account-level pacing, health monitoring, and safe pause/resume recovery.</div>
+<p>This positioning is stronger than promising “instant bulk sending” or implying that a specific delay can prevent provider restrictions.</p>
+</section>
+
+<footer>Architecture explainer • Self-contained HTML • No external libraries required</footer>
+</div>
+</body>
+</html>

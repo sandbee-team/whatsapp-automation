@@ -1,0 +1,23 @@
+{
+  "name": "india-4g-mid-tier-mobile",
+  "rttMs": 150,
+  "throughputKbps": 1600,
+  "uploadThroughputKbps": 750,
+  "cpuSlowdownMultiplier": 4,
+  "formFactor": "mobile",
+  "screenEmulation": {
+    "mobile": true,
+    "width": 412,
+    "height": 823,
+    "deviceScaleFactor": 1.75,
+    "disabled": false
+  },
+  "lighthouseThrottling": {
+    "rttMs": 150,
+    "throughputKbps": 1600,
+    "requestLatencyMs": 562.5,
+    "downloadThroughputKbps": 1440,
+    "uploadThroughputKbps": 675,
+    "cpuSlowdownMultiplier": 4
+  }
+}

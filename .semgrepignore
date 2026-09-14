@@ -1,0 +1,29 @@
+# .semgrepignore (P29a step 7) - traversal pruning for the pinned semgrep image.
+#
+# There is no .gitignore-driven pruning here (this repo has no git, ADR 0003),
+# so without this file semgrep WALKS every node_modules / dist / build tree
+# before applying the CLI --exclude patterns - on the Windows Docker Desktop
+# bind mount that walk alone took ~16 minutes on 2026-09-09. Directories
+# listed here are pruned during targeting and never entered.
+#
+# This file only narrows WHERE semgrep looks; the rules live in .semgrep.yml
+# and the per-rule test/fixture exclusions live there and in the CLI flags
+# (scripts/guards/security-scan-lib.ts). Keep the three lists in agreement.
+#
+# scripts/guards/__fixtures__/ is deliberately NOT listed: the fixture proof
+# (`each_scanner_fails_on_its_seeded_fixture`) points semgrep AT that tree, and
+# an ignore here would prune the scan target itself and turn the proof into a
+# silent zero-file pass (P29a C1 CRITICAL, 2026-09-09). The repo-root scan
+# excludes it through the CLI --exclude flags instead.
+node_modules/
+dist/
+coverage/
+.turbo/
+.next/
+website/out/
+demo/
+.memory/
+.claude/
+.secrets/
+.data/
+test-results/

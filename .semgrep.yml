@@ -1,0 +1,124 @@
+# P29a launch-hardening Unit U1 - repo-owned semgrep ruleset.
+#
+# This ruleset is FULLY VENDORED: every rule is written inline below, there
+# is no `--config auto`/`--config p/...` registry fetch, and the CLI is
+# always invoked with `--metrics=off` (see security-scan-lib.ts). That makes
+# this file the entire pin for what gets checked - content-addressed by
+# whatever copy of this file the CI step reads, never a moving upstream
+# ruleset that can change behaviour underneath us without a diff here.
+#
+# ids are prefixed `wp.` so they never collide with a vendored/registry rule
+# id if one is ever added later.
+rules:
+  - id: wp.api-role-no-child-process
+    languages: [typescript]
+    severity: ERROR
+    message: >-
+      The api role must never import node:child_process (or child_process) -
+      shelling out from the request-handling role is a durable-first
+      violation (core invariant 1) and a command-injection surface.
+    paths:
+      include:
+        - app/backend/src/roles/api.ts
+    pattern-either:
+      - pattern: import $X from "child_process"
+      - pattern: import $X from "node:child_process"
+      - pattern: require("child_process")
+      - pattern: require("node:child_process")
+
+  - id: wp.no-tls-verification-disabled
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      TLS certificate verification must never be disabled (defence in depth
+      alongside scripts/check-no-insecure-tls.ts).
+    pattern-either:
+      - pattern: rejectUnauthorized = false
+      - pattern: |
+          {..., rejectUnauthorized: false, ...}
+      - pattern: process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"
+      - pattern: process.env.NODE_TLS_REJECT_UNAUTHORIZED = $ANY
+
+  - id: wp.no-math-random-in-security-path
+    languages: [typescript]
+    severity: ERROR
+    message: >-
+      Math.random() is not cryptographically secure - forbidden in
+      identity/crypto/HTTP-boundary PRODUCTION code. Use node:crypto instead.
+    paths:
+      include:
+        - packages/server-kit/src/**
+        - app/backend/src/modules/identity/**
+        - app/backend/src/platform/http/**
+        - admin/backend/src/modules/**
+      # Rule-level paths.exclude (unlike the document-root block at the
+      # bottom of this file) IS reliable on the pinned semgrep version -
+      # verified empirically, see docs/evidence/P29-security-scans.md. Test
+      # helpers that generate non-secret fixture data (a random port, a
+      # random suffix for uniqueness) are not the security-path code this
+      # rule targets.
+      exclude:
+        - '**/__tests__/**'
+        - '**/*.test.ts'
+        - '**/*.integration.test.ts'
+    pattern: Math.random()
+
+  - id: wp.no-eval
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: eval() executes arbitrary strings as code - never permitted.
+    pattern: eval(...)
+
+  - id: wp.no-new-function
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      new Function(...) compiles arbitrary strings as code, equivalent to
+      eval() - never permitted.
+    pattern: new Function(...)
+
+  - id: wp.no-child-process-exec-with-interpolation
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      child_process.exec with a template-interpolated or concatenated
+      command string is a command-injection risk - use execFile/spawn with
+      an argument array instead.
+    patterns:
+      - pattern-either:
+          - pattern: $CP.exec(`...${$X}...`, ...)
+          - pattern: $CP.exec($A + $B, ...)
+
+  - id: wp.no-dangerously-set-inner-html-dynamic
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      dangerouslySetInnerHTML with a non-literal value is an XSS risk unless
+      the value has been through an explicit sanitizer.
+    patterns:
+      - pattern: '<$EL dangerouslySetInnerHTML={{__html: $X}} />'
+      - metavariable-pattern:
+          metavariable: $X
+          patterns:
+            - pattern-not: '"..."'
+            - pattern-not: "'...'"
+
+# Global exclusions - documentation only. The ACTUAL enforcement is the
+# `--exclude` CLI flag list in scripts/guards/security-scan-lib.ts
+# (SEMGREP_CLI_EXCLUDES): this YAML-level `paths.exclude` block was verified
+# empirically to be unreliable on the pinned semgrep version (a real test
+# file still matched a rule despite being listed here - see
+# docs/evidence/P29-security-scans.md), so it must never be relied on alone.
+paths:
+  exclude:
+    - '**/node_modules/**'
+    - '**/dist/**'
+    - '**/coverage/**'
+    - 'website/out/**'
+    - '**/.next/**'
+    - 'demo/**'
+    - '.memory/**'
+    - 'scripts/guards/__fixtures__/**'
+    - '**/*.test.ts'
+    - '**/*.test.tsx'
+    - '**/*.spec.ts'

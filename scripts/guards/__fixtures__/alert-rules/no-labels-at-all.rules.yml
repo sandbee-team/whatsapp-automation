@@ -1,0 +1,10 @@
+groups:
+  - name: fixture-no-labels-at-all
+    rules:
+      - alert: NoLabelsAtAll
+        expr: wp_instances_unowned > 0
+        for: 2m
+        annotations:
+          summary: 'fixture: no labels key at all, never just missing severity'
+          description: 'fixture only - never a real alert'
+          runbook_url: docs/RUNBOOK.md#alert-instances-unowned

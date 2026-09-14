@@ -1,0 +1,26 @@
+{
+  "name": "@wp/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tsconfig.base.json": "./tsconfig.base.json",
+    "./eslint.config.js": "./eslint.config.js",
+    "./prettier.config.mjs": "./prettier.config.mjs",
+    "./vitest.base.ts": "./vitest.base.ts"
+  },
+  "files": [
+    "tsconfig.base.json",
+    "tsconfig.json",
+    "eslint.config.js",
+    "prettier.config.mjs",
+    "vitest.base.ts"
+  ],
+  "dependencies": {
+    "@eslint/js": "^10.0.1",
+    "globals": "^17.11.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.68.0",
+    "vitest": "^4.1.11"
+  }
+}

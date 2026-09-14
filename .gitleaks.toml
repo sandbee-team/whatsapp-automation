@@ -1,0 +1,53 @@
+# P29a launch-hardening Unit U1 - gitleaks allow-list config.
+#
+# `[extend] useDefault = true` keeps the FULL default gitleaks rule set
+# (github-pat, aws-access-token, generic high-entropy secret, etc.) - nothing
+# below disables a single rule. The `[allowlist]` only excludes PATHS that
+# are not real secret-bearing source (build artefacts, this repo's own
+# fixtures, the designated local dev-secret store, docs/measurements).
+#
+# `.secrets/**` is allow-listed here because it is the repo's DESIGNATED
+# local secret store (see `.secrets/dev.env`), not a place a real secret
+# accidentally leaked into source - the point of this scanner is to catch
+# secrets OUTSIDE that store.
+#
+# Gitleaks always runs in filesystem mode (`gitleaks dir`, never `detect`/
+# `git`/`protect`) - this repo must never become a git repository (ADR 0003).
+[extend]
+useDefault = true
+
+#
+# `scripts/guards/__fixtures__/security/**` IS allow-listed below for the
+# real full-repo scan (`security-scan-runner.ts`'s production invocation
+# mounts the whole repo at `/src`, so this path segment appears in the
+# reported findings there). This does NOT hide the guard's own proof: the
+# fixture-proof test (`security-scan.test.ts`'s
+# `each_scanner_fails_on_its_seeded_fixture`) points `scanRoot` directly AT
+# one fixture directory, which `buildSecretScanArgv` then mounts as its own
+# `/src` (config on a separate `/src-repo` mount) - the reported path in
+# that case is just `/src/config.ts`, never containing a `__fixtures__`
+# segment, so this allowlist entry cannot match it (verified empirically -
+# see docs/evidence/P29-security-scans.md).
+[allowlist]
+paths = [
+  '''node_modules''',
+  '''dist''',
+  '''website/out''',
+  '''\.next''',
+  '''demo''',
+  '''\.memory''',
+  '''\.claude''',
+  '''scripts/guards/__fixtures__/security''',
+  '''\.snapshot\.json$''',
+  '''docs/measurements''',
+  '''\.secrets''',
+  # Test-only files: fixed test-fixture strings/self-signed test
+  # certificates that trip the generic-entropy/private-key rules but are
+  # not real secrets - verified individually (see
+  # docs/evidence/P29-security-scans.md "Open findings" for the full list
+  # this exclusion was derived from). Never a path under a real source
+  # module's non-test files.
+  '''\.test\.ts$''',
+  '''\.integration\.test\.ts$''',
+  '''__fixtures__/tls''',
+]

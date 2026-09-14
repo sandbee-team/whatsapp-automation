@@ -1,0 +1,86 @@
+# P29a launch-hardening Unit U1 - trivy filesystem-scan config.
+#
+# Read by `docker run ... aquasec/trivy fs --config /src/infra/deploy/trivy.yaml
+# ... /src` (see scripts/guards/security-scan-lib.ts's buildTrivyArgv). Fails
+# the build on any HIGH/CRITICAL finding that already has a fixed version
+# available (`ignore-unfixed: true` - a finding with no fix yet is tracked,
+# never a build-blocker with nothing actionable to do about it today).
+#
+# A vulnerability-DB download failure is ALWAYS a build failure, never a
+# silent pass with a stale/absent DB - `skip-db-update: false` (never set to
+# true) and `security-scan-lib.ts`'s `classifyScannerExit` treats any
+# DB-download-failure message pattern as its own `db-download-failed` exit
+# code regardless of the scanner's own process exit status.
+#
+# Schema verified against `trivy fs --generate-default-config` on the pinned
+# image (0.58.1) - `skip-dirs`/`skip-files` live UNDER `scan:`, not at the
+# document root (an earlier root-level placement here silently matched
+# nothing and let demo/**/package-lock.json vulnerabilities leak into the
+# real-tree scan - see docs/evidence/P29-security-scans.md).
+scan:
+  scanners:
+    - vuln
+    - secret
+    - misconfig
+  # A bare directory name (e.g. "demo") only matches a path that IS exactly
+  # that name, never its descendants - `doublestar` glob matching against
+  # the full relative path. Every real exclusion therefore needs the
+  # "<dir>/**" form to actually skip its contents.
+  skip-dirs:
+    - '**/node_modules/**'
+    - '**/dist/**'
+    - '**/coverage/**'
+    - 'website/out/**'
+    - '**/.next/**'
+    - 'demo/**'
+    - '.memory/**'
+    - '.claude/**'
+    # Every `__fixtures__/` directory in the tree - test-only fixtures
+    # (self-signed TLS test certs/keys, planted fake secrets) trip the
+    # `secret` scanner's private-key/generic-secret rules but are not real
+    # credentials. `scripts/guards/__fixtures__/**` is the specific case
+    # this repo's own guard tests seed; the general form catches every
+    # other test-fixture directory too (e.g.
+    # app/backend/src/platform/http/__fixtures__/tls/*.pem).
+    - '**/__fixtures__/**'
+  skip-files:
+    - '**/*.snapshot.json'
+
+severity:
+  - HIGH
+  - CRITICAL
+
+exit-code: 1
+
+# The default 5m budget is not enough for a misconfig+vuln+secret scan of
+# the whole repo tree (Helm/Terraform/CloudFormation policy evaluation is
+# the slow part) - see docs/evidence/P29-security-scans.md for the measured
+# real-tree runtime this value was chosen against.
+timeout: 15m
+
+db:
+  skip-db-update: false
+  repository:
+    - ghcr.io/aquasecurity/trivy-db:2
+  java-repository:
+    - ghcr.io/aquasecurity/trivy-java-db:1
+
+vulnerability:
+  # Only report vulnerabilities that already have a fixed version - matches
+  # the "fails on HIGH/CRITICAL with a fixed version available" policy.
+  ignore-unfixed: true
+
+# --- Future production image scan (not wired into any script yet - the
+# production image does not exist as of this phase) ---
+#
+# Once `infra/deploy/` builds a real production image, the SAME pinned trivy
+# image must scan it before every deploy:
+#
+#   docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+#     -v wp-trivy-cache:/root/.cache/ \
+#     aquasec/trivy@sha256:<pinned-digest> \
+#     image --config infra/deploy/trivy.yaml --exit-code 1 \
+#     --severity HIGH,CRITICAL wp-backend:<tag>
+#
+# A scanner that cannot run (missing Docker, DB download failure) fails the
+# deploy - it is never treated as an implicit pass.

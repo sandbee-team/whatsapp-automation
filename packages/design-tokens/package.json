@@ -1,0 +1,19 @@
+{
+  "name": "@wp/design-tokens",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tokens.css": "./css/tokens.css",
+    "./tailwind.css": "./css/tailwind-theme.css"
+  },
+  "scripts": {
+    "tokens:build": "node build.mjs"
+  },
+  "devDependencies": {
+    "style-dictionary": "^5.5.2"
+  }
+}
