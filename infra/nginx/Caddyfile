@@ -80,8 +80,20 @@
 	# regardless of the order written here, but try_files-then-file_server
 	# matches the order the upstream docs use for this exact SPA idiom.
 	root * /srv/app
-	try_files {path} /index.html
-	file_server
+	# The SPA fallback MUST live inside its own `handle`, not as bare
+	# directives. Caddy runs bare directives in its own fixed execution
+	# order, OUTSIDE the `handle` blocks above - so a bare `file_server`
+	# answers /v1/* itself and the reverse_proxy above never runs. Proven
+	# live 2026-09-15: `POST /v1/auth/login` through the edge returned
+	# Caddy's own `405 allow: GET, HEAD` (file_server's answer to a POST)
+	# while the identical request straight to api:3000 returned the correct
+	# 400 VALIDATION_ERROR. Wrapping these two in `handle` puts them in the
+	# same ordered chain as the `/v1/*` handler above, so the first matching
+	# handle wins and only unmatched paths fall through to the SPA.
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
 
 	# Security headers (HSTS, CSP, etc.) are deliberately NOT set here - the
 	# README says they belong per-route in each application, not the edge,
@@ -115,6 +127,10 @@
 	}
 
 	root * /srv/admin
-	try_files {path} /index.html
-	file_server
+	# Same `handle`-wrapping rationale as the app block above - without it a
+	# bare file_server would answer /admin/v1/* instead of the reverse_proxy.
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
 }

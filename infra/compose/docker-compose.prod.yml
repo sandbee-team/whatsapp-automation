@@ -157,6 +157,29 @@ services:
       MAX_CLIENT_CONN: ${PGBOUNCER_MAX_CLIENT_CONN:-4000}
       SERVER_IDLE_TIMEOUT: 60
       ADMIN_USERS: ${POSTGRES_USER:-wp}
+      # REQUIRED with POOL_MODE: transaction. `db/src/pool.ts`'s
+      # `buildSessionOptions` sends `-c statement_timeout=… -c
+      # idle_in_transaction_session_timeout=…` as the libpq `options` STARTUP
+      # parameter, and a transaction-mode pooler rejects any startup parameter
+      # it cannot replay onto a reused server connection. Without this line
+      # every role that opens a pool dies at boot with
+      #   FATAL 08P01: unsupported startup parameter in options: statement_timeout
+      # Proven live 2026-09-15: admin-api, cron and relay all crash-looped on
+      # exactly that error against this compose file until this was added
+      # (`api` survived only because it had booted before pgbouncer was in the
+      # path). extra_float_digits is the conventional third entry - the pg
+      # driver sends it on every connection.
+      #
+      # THE TRADE-OFF, STATED HONESTLY: "ignore" means pgbouncer DROPS these
+      # parameters, it does not forward them. So the server-side statement and
+      # idle-in-transaction ceilings that `pool.ts` intends are NOT in force on
+      # any pooled connection. Set them on the database itself so they apply to
+      # every connection regardless of path:
+      #   ALTER DATABASE wp SET statement_timeout = '30s';
+      #   ALTER DATABASE wp SET idle_in_transaction_session_timeout = '60s';
+      # That is a launch-checklist item, not an optional tune - until it is
+      # done a runaway query has no server-side ceiling.
+      IGNORE_STARTUP_PARAMETERS: extra_float_digits,statement_timeout,idle_in_transaction_session_timeout
     depends_on:
       postgres:
         condition: service_healthy
