@@ -164,6 +164,20 @@ export function ConnectSheetBody({ flow }: { flow: ConnectFlow }): React.JSX.Ele
         </Button>
       ) : null}
 
+      {stage.name === 'linking' ? (
+        // 2026-09-15 bug fix: `goOnline` no longer jumps straight to
+        // 'connected' on the `/online` 200 (that call only sets
+        // `desired_state` - see `useConnectFlow.ts#goOnline`'s comment). This
+        // is the honest "still pairing" waiting state shown until
+        // `linkStream.healthState` actually reports 'connected'.
+        <div data-testid="connect-linking-state" className="flex flex-col gap-2">
+          <h3 className="text-base font-semibold font-ui text-fg">
+            {t('instances.connect.linking.title')}
+          </h3>
+          <p className="text-sm font-ui text-muted">{t('instances.connect.linking.body')}</p>
+        </div>
+      ) : null}
+
       {stage.name === 'connected' ? (
         <div data-testid="connect-connected-state" className="flex flex-col gap-2">
           <h3 className="text-base font-semibold font-ui text-success">
@@ -226,7 +240,10 @@ export function ConnectSheetBody({ flow }: { flow: ConnectFlow }): React.JSX.Ele
         </div>
       ) : null}
 
-      {stage.name === 'connected' || stage.name === 'parked' || stage.name === 'challenge' ? (
+      {stage.name === 'connected' ||
+      stage.name === 'parked' ||
+      stage.name === 'challenge' ||
+      stage.name === 'linking' ? (
         flow.activeInstanceId ? (
           <Button
             type="button"

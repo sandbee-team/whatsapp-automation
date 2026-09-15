@@ -63,12 +63,38 @@ export function useConnectFlow({ open, realtimeState, t }: UseConnectFlowOptions
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  // 'linking' MUST stay in this list: it is the post-`/online` waiting stage
+  // (see `goOnline` below), and the effect that promotes it to 'connected'
+  // depends entirely on `linkStream` still receiving `instance.health_changed`
+  // events / `link-status` polls for this instance. Dropping 'linking' here
+  // would silently stop the stream at the exact moment the user is waiting
+  // for proof of a real link, stranding them on the waiting screen forever.
   const activeInstanceId =
-    stage.name === 'method' || stage.name === 'phone' || stage.name === 'challenge'
+    stage.name === 'method' ||
+    stage.name === 'phone' ||
+    stage.name === 'challenge' ||
+    stage.name === 'linking'
       ? stage.instanceId
       : null;
 
   const linkStream = useLinkStream({ instanceId: activeInstanceId, isOpen: open, realtimeState });
+
+  // FIX (2026-09-15 live bug): `POST /online` only flips `desired_state` to
+  // 'online' (`instance-online-slot.repo.ts` setOnlineWithSlotCheck) - it
+  // says nothing about whether the device is actually paired. Observed live:
+  // a row with `link_state='pairing'`, `phone_e164=null`, `qr_attempts=4`
+  // rendered "Connected - This number is linked and ready." because
+  // `goOnline` treated the POST's 200 as proof of a link. The real proof is
+  // `healthState === 'connected'`, which only ever arrives via
+  // `useLinkStream` - either the `instance.health_changed` SSE event or its
+  // `link-status` poll fallback. So `goOnline` now lands on the 'linking'
+  // waiting stage, and only THIS effect - watching real link evidence - may
+  // advance to 'connected'.
+  React.useEffect(() => {
+    if (stage.name !== 'linking') return;
+    if (linkStream.healthState !== 'connected') return;
+    setStage({ name: 'connected', maskedNumber: linkStream.maskedNumber });
+  }, [stage, linkStream.healthState, linkStream.maskedNumber]);
 
   React.useEffect(() => {
     if (!open) {
@@ -173,7 +199,11 @@ export function useConnectFlow({ open, realtimeState, t }: UseConnectFlowOptions
     void withSubmit(async () => {
       try {
         await online(instanceId);
-        setStage({ name: 'connected', maskedNumber: linkStream.maskedNumber });
+        // Do NOT set 'connected' here - see the FIX comment above
+        // `activeInstanceId`. This 200 only proves `desired_state` flipped;
+        // 'linking' is left honest ("still pairing") until the effect above
+        // sees real evidence.
+        setStage({ name: 'linking', instanceId });
       } catch (error) {
         if (isNoFreeSlotError(error)) {
           setStage({ name: 'noFreeSlot', instanceId, holders: error.details.holders });
@@ -210,7 +240,10 @@ export function useConnectFlow({ open, realtimeState, t }: UseConnectFlowOptions
       try {
         await park(holderInstanceId);
         await online(instanceId);
-        setStage({ name: 'connected', maskedNumber: linkStream.maskedNumber });
+        // Same fix as `goOnline` above: the `/online` 200 here is proof of a
+        // slot swap, not proof of a link - land on 'linking' and let real
+        // link evidence (via `linkStream`) drive the 'connected' transition.
+        setStage({ name: 'linking', instanceId });
       } catch {
         setErrorMessage(t('instances.connect.genericError'));
       }

@@ -13,11 +13,11 @@ import { I18nProvider, ToastProvider } from '@wp/ui';
 import { InstanceDetailPage } from '../components/instance-detail-page.js';
 
 /**
- * instance-detail-page.test.tsx (P26b U3) - the detail page's pause/resume
- * actions: both confirm via `AlertDialog` before calling `park`/`online`,
- * then toast success. Drives a minimal memory router mounted at
- * `/_authed/instances/$id` (the page reads `id` via `useParams`), stubbing
- * only `fetch`.
+ * instance-detail-page.test.tsx (P26b U3; delete added 2026-09-15) - the
+ * detail page's pause/resume/delete actions: all three confirm via
+ * `AlertDialog` before calling `park`/`online`/`DELETE .../:id`, then toast
+ * success. Drives a minimal memory router mounted at `/_authed/instances/$id`
+ * (the page reads `id` via `useParams`), stubbing only `fetch`.
  */
 
 const INSTANCE_ID = '11111111-1111-4111-8111-111111111111';
@@ -86,6 +86,9 @@ function stubFetch(cardOverrides: Record<string, unknown> = {}): ReturnType<type
     }
     if (url.includes(`/v1/instances/${INSTANCE_ID}/online`) && init?.method === 'POST') {
       return jsonResponse({ id: INSTANCE_ID, parked: false });
+    }
+    if (url.endsWith(`/v1/instances/${INSTANCE_ID}`) && init?.method === 'DELETE') {
+      return jsonResponse({ deleted: true });
     }
     throw new Error(`unexpected fetch: ${url}`);
   });
@@ -188,6 +191,46 @@ describe('InstanceDetailPage', () => {
 
     fireEvent.click(await screen.findByTestId('needs-action-reconnect'));
 
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/instances');
+    });
+    expect(await screen.findByTestId('instances-list-screen')).toBeTruthy();
+  });
+
+  it('a_linked_instance_never_shows_the_delete_action', async () => {
+    // Default cardResponse() is linkState: 'linked' - the backend's own
+    // guard (instances.routes.ts's DELETE handler) 409s INVALID_STATE for
+    // exactly this state, so the button must not even render (never a
+    // click that is guaranteed to fail server-side).
+    stubFetch();
+    renderDetailPage();
+
+    await screen.findByTestId('instance-detail-pause-button');
+    expect(screen.queryByTestId('instance-detail-delete-button')).toBeNull();
+  });
+
+  it('deleting_an_unlinked_number_confirms_calls_delete_and_navigates_to_numbers', async () => {
+    const fetchMock = stubFetch({ linkState: 'unlinked', healthState: 'never_linked' });
+    const router = renderDetailPage();
+
+    fireEvent.click(await screen.findByTestId('instance-detail-delete-button'));
+
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(([input, init]) => {
+          const url = typeof input === 'string' ? input : (input as URL).toString();
+          return url.endsWith(`/v1/instances/${INSTANCE_ID}`) && init?.method === 'DELETE';
+        }),
+      ).toBe(true);
+    });
+
+    // Unlike pause/resume (same page, refetch via onMutated), a deleted
+    // instance's own card no longer exists - the header navigates back to
+    // the numbers list rather than invalidating a query that would just
+    // 404 on its next fetch.
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/instances');
     });

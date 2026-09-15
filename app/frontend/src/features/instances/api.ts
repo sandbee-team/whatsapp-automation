@@ -9,6 +9,7 @@ import {
   onlineInstanceOutputSchema,
   parkInstanceOutputSchema,
   refreshLinkOutputSchema,
+  deleteInstanceOutputSchema,
   instanceCardOutputSchema,
   healthWhyOutputSchema,
 } from '@wp/contracts';
@@ -16,9 +17,10 @@ import { apiFetch, ApiError } from '../../lib/api-client.js';
 
 /**
  * features/instances/api.ts (P08 U7; P17 U5 added `fetchInstanceCard` /
- * `fetchHealthWhy`) - the instance link/park routes plus the two P17 read
- * routes (`GET /v1/instances/:id/card`, `GET /v1/instances/:id/health/why`).
- * Every response type is inferred FROM the imported `@wp/contracts` schemas
+ * `fetchHealthWhy`; 2026-09-15 added `deleteInstance`) - the instance
+ * link/park/delete routes plus the two P17 read routes (`GET
+ * /v1/instances/:id/card`, `GET /v1/instances/:id/health/why`). Every
+ * response type is inferred FROM the imported `@wp/contracts` schemas
  * (never hand-typed), so a contract change is a compile error here, not a
  * silent drift.
  */
@@ -82,6 +84,21 @@ export function online(instanceId: string): Promise<OnlineInstanceResult> {
 
 export function park(instanceId: string): Promise<ParkInstanceResult> {
   return apiFetch<ParkInstanceResult>(`/v1/instances/${instanceId}/park`, { method: 'POST' });
+}
+
+export type DeleteInstanceResult = z.infer<typeof deleteInstanceOutputSchema>['data'];
+
+/**
+ * Soft-deletes an instance (2026-09-15 founder request) - frees its
+ * `max_registered_instances` plan slot and removes it from every list read
+ * (`GET /v1/queue-status`, the instance card). The backend guard 409s
+ * `INVALID_STATE` for a still-`linked` instance; callers only ever offer
+ * this action for an already-unlinked/parked one (see
+ * `InstanceDetailHeader`'s own `canDelete` check) so a user should never hit
+ * that guard through the UI.
+ */
+export function deleteInstance(instanceId: string): Promise<DeleteInstanceResult> {
+  return apiFetch<DeleteInstanceResult>(`/v1/instances/${instanceId}`, { method: 'DELETE' });
 }
 
 export type InstanceCardResult = z.infer<typeof instanceCardOutputSchema>['data'];

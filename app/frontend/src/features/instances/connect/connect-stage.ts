@@ -3,17 +3,26 @@ import { phoneE164Schema } from '@wp/contracts';
 import type { NoFreeSlotDetails } from '../api.js';
 
 /**
- * connect-stage.ts (P08 U7) - the `ConnectSheet` state machine shape, split
- * out of `useConnectFlow.ts`/`ConnectSheet.tsx` so both can import the same
- * type without a circular import. Kept as one discriminated `stage` union
- * rather than several booleans, so an invalid combination (e.g. "showing the
- * QR panel with no instanceId") is unrepresentable.
+ * connect-stage.ts (P08 U7; 2026-09-15 bug fix added `'linking'`) - the
+ * `ConnectSheet` state machine shape, split out of
+ * `useConnectFlow.ts`/`ConnectSheet.tsx` so both can import the same type
+ * without a circular import. Kept as one discriminated `stage` union rather
+ * than several booleans, so an invalid combination (e.g. "showing the QR
+ * panel with no instanceId") is unrepresentable.
+ *
+ * `'linking'` sits between `'challenge'` and `'connected'`: it is entered the
+ * moment `POST /online` resolves (see `useConnectFlow.ts#goOnline`) and left
+ * only once real link evidence arrives over `useLinkStream`. Without it, a
+ * live bug (2026-09-15) rendered "Connected - This number is linked and
+ * ready." for a row whose `link_state` was still `pairing` with a null
+ * `phone_e164` - the `/online` 200 was mistaken for proof of a link.
  */
 export type ConnectStage =
   | { name: 'create' }
   | { name: 'method'; instanceId: string }
   | { name: 'phone'; instanceId: string }
   | { name: 'challenge'; instanceId: string; method: 'qr' | 'code' }
+  | { name: 'linking'; instanceId: string }
   | { name: 'connected'; maskedNumber: string | null }
   | { name: 'parked' }
   | { name: 'noFreeSlot'; instanceId: string; holders: NoFreeSlotDetails['holders'] }

@@ -106,6 +106,88 @@ describe('ConnectSheet', () => {
     expect(fullDom).not.toMatch(/\+91\d{10}/u);
   });
 
+  it('online_resolving_alone_never_shows_connected_without_real_link_evidence', async () => {
+    // 2026-09-15 live bug: `POST /online` only sets `desired_state='online'`
+    // (`instance-online-slot.repo.ts#setOnlineWithSlotCheck`) - it says
+    // nothing about whether the device paired. A real row was observed with
+    // `link_state='pairing'`, `phone_e164=null`, `qr_attempts=4` while the
+    // Connect sheet showed "Connected - This number is linked and ready."
+    // This test's `link-status` mock NEVER reports `healthState: 'connected'`
+    // (it stays 'never_linked'/'pairing' throughout, as the real row was) -
+    // so a correct flow must land on the honest 'linking' waiting stage and
+    // must NOT render `connect-connected-state`, even though the `/online`
+    // call itself resolves 200.
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      const method = init?.method ?? 'GET';
+
+      if (url === '/v1/instances' && method === 'POST') {
+        return Promise.resolve(
+          jsonResponse({
+            data: {
+              id: INSTANCE_ID,
+              label: 'Sales',
+              linkState: 'unlinked',
+              healthState: 'never_linked',
+              desiredState: 'offline',
+            },
+            meta: { requestId: 'r1' },
+          }),
+        );
+      }
+      if (url === `/v1/instances/${INSTANCE_ID}/link` && method === 'POST') {
+        return Promise.resolve(
+          jsonResponse({ data: { linkState: 'pairing' }, meta: { requestId: 'r2' } }),
+        );
+      }
+      if (url === `/v1/instances/${INSTANCE_ID}/online` && method === 'POST') {
+        return Promise.resolve(
+          jsonResponse({ data: { desiredState: 'online' }, meta: { requestId: 'r3' } }),
+        );
+      }
+      if (url === `/v1/instances/${INSTANCE_ID}/link-status`) {
+        // Mirrors the real live row exactly: still `pairing`/`never_linked`,
+        // no masked number, even after `/online` has resolved. Never
+        // 'connected' anywhere in this test.
+        return Promise.resolve(
+          jsonResponse({
+            data: {
+              linkState: 'pairing',
+              healthState: 'never_linked',
+              desiredState: 'online',
+              needsUserAction: false,
+              userActionReason: null,
+              attemptsLeft: 3,
+              maskedNumber: null,
+            },
+            meta: { requestId: 'r4' },
+          }),
+        );
+      }
+      throw new Error(`unexpected fetch: ${method} ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderConnectSheet();
+    await createInstanceAndChooseQr();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('connect-go-online-button')).not.toBeNull();
+    });
+
+    fireEvent.click(screen.getByTestId('connect-go-online-button'));
+
+    // The honest waiting stage must appear...
+    await waitFor(() => {
+      expect(screen.getByTestId('connect-linking-state')).not.toBeNull();
+    });
+
+    // ...and the connected stage must never appear, no matter how long we
+    // give the poll to keep firing with the same unlinked evidence.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByTestId('connect-connected-state')).toBeNull();
+  });
+
   it('parked_copy_renders_the_domain_constant_verbatim', async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString();

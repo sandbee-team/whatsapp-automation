@@ -179,6 +179,26 @@ export const resumeInstanceContract = oc
   .input(resumeInstanceInputSchema)
   .output(resumeInstanceOutputSchema);
 
+// ---------------------------------------------------------------------
+// DELETE /v1/instances/:id (2026-09-15 founder request) - soft delete only.
+// `deleted: true` is the entire success body (there is no other state left
+// to report - the row is gone from every read the client can make). The
+// route's own 409 INVALID_STATE guard (a still-`linked` instance) reuses the
+// SAME `INVALID_STATE` code the link/refresh route already established
+// above, not a new one - same failure SHAPE (a well-formed request refused
+// for a current-state reason), so no new ERROR_CODES entry.
+// ---------------------------------------------------------------------
+
+export const deleteInstanceOutputSchema = successEnvelope(
+  z.object({
+    deleted: z.literal(true),
+  }),
+);
+
+export const deleteInstanceContract = oc
+  .route({ method: 'DELETE', path: '/v1/instances/{id}' })
+  .output(deleteInstanceOutputSchema);
+
 export const instancesContract = {
   create: createInstanceContract,
   link: linkInstanceContract,
@@ -187,4 +207,5 @@ export const instancesContract = {
   online: onlineInstanceContract,
   park: parkInstanceContract,
   resume: resumeInstanceContract,
+  delete: deleteInstanceContract,
 } as const;

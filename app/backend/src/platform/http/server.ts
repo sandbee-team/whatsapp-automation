@@ -9,6 +9,7 @@ import {
   registerInstancesRoutes,
   registerResumeRoute,
   registerCardRoutes,
+  registerDeleteInstanceRoute,
   type InstancesRoutesDeps,
   type ResumeRoutesDeps,
   type CardRoutesDeps,
@@ -164,6 +165,11 @@ export async function buildApp(deps: BuildAppDeps): Promise<FastifyInstance> {
   registerIdentityRoutes(app, deps.identity);
   registerOnboardingRoutes(app, deps.onboarding, deps.authDeps);
   registerInstancesRoutes(app, deps.instances, deps.authDeps);
+  // 2026-09-15 founder request: DELETE /v1/instances/:id - unconditional
+  // (never optional) because it needs nothing beyond the SAME
+  // `InstancesRoutesDeps` that `registerInstancesRoutes` above already
+  // requires unconditionally; no new wiring for `roles/api.ts` to do.
+  registerDeleteInstanceRoute(app, deps.instances, deps.authDeps);
   if (deps.resume) {
     registerResumeRoute(app, deps.resume, deps.authDeps);
   }

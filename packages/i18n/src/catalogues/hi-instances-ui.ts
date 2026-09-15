@@ -46,6 +46,14 @@ export const hiInstancesUi = {
   'instances.detail.pauseError': 'यह नंबर रोका नहीं जा सका। कृपया फिर से प्रयास करें।',
   'instances.detail.resumeSuccess': 'नंबर फिर से ऑनलाइन है।',
   'instances.detail.resumeError': 'यह नंबर ऑनलाइन नहीं लाया जा सका। कृपया फिर से प्रयास करें।',
+  'instances.detail.delete': 'हटाएं',
+  'instances.detail.deleteConfirmTitle': 'इस नंबर को हटाएं?',
+  'instances.detail.deleteConfirmBody':
+    'इससे यह नंबर आपके वर्कस्पेस से हट जाएगा और आपके प्लान में एक नए नंबर के लिए जगह खाली हो ' +
+    'जाएगी। इसका संदेश और कतार इतिहास मिटाया नहीं जाता, सुरक्षित रहता है। इसे यहां से वापस नहीं ' +
+    'लिया जा सकता।',
+  'instances.detail.deleteSuccess': 'नंबर हटा दिया गया।',
+  'instances.detail.deleteError': 'यह नंबर हटाया नहीं जा सका। कृपया फिर से प्रयास करें।',
   'instances.detail.tabs.overview': 'अवलोकन',
   'instances.detail.tabs.health': 'स्वास्थ्य',
   'instances.detail.tabs.queue': 'कतार',

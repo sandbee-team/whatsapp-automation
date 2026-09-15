@@ -27,7 +27,10 @@ import {
 /**
  * instances.routes.ts (P08 Unit U6c) - the instance link/park routes. Typed
  * errors and the shared helpers live in `instances.routes-support.ts`
- * (max-lines discipline).
+ * (max-lines discipline). `DELETE /v1/instances/:id` (2026-09-15 founder
+ * request) is a SIBLING file, `delete.routes.ts` - this file already sits at
+ * the 300-line max-lines cap, same split rationale `resume.routes.ts`'s own
+ * header documents for `POST .../resume`.
  *
  * Every `:id` route scopes ownership by `id + clientId` - a foreign or absent
  * instance id returns 404 NOT_FOUND, never a 403-with-existence leak (tenant

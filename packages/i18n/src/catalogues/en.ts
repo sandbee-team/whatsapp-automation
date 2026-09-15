@@ -101,6 +101,9 @@ export const en = {
   'instances.connect.code.expired': 'This code has expired.',
   'instances.connect.code.refreshButton': 'Generate a new code',
 
+  'instances.connect.linking.title': 'Finishing up',
+  'instances.connect.linking.body': 'Waiting for WhatsApp to confirm the link on your phone.',
+
   'instances.connect.connected.title': 'Connected',
   'instances.connect.connected.body': 'This number is linked and ready.',
 

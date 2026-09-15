@@ -96,6 +96,9 @@ export const hi = {
   'instances.connect.code.expired': 'यह कोड समय सीमा समाप्त हो चुका है।',
   'instances.connect.code.refreshButton': 'नया कोड जनरेट करें',
 
+  'instances.connect.linking.title': 'पूरा किया जा रहा है',
+  'instances.connect.linking.body': 'आपके फ़ोन पर व्हाट्सऐप से लिंक की पुष्टि का इंतज़ार है।',
+
   'instances.connect.connected.title': 'जुड़ गया',
   'instances.connect.connected.body': 'यह नंबर जुड़ा हुआ और उपयोग के लिए तैयार है।',
 

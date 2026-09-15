@@ -62,6 +62,9 @@ export { createInstanceOwnership, type InstanceOwnershipDb } from './ownership.j
 export { registerResumeRoute, type ResumeRoutesDeps } from './resume.routes.js';
 export { resumeInstance, type ResumeInstanceDeps, type ResumeInstanceInput } from './resume.js';
 
+// 2026-09-15 founder request: DELETE /v1/instances/:id (soft delete).
+export { registerDeleteInstanceRoute } from './delete.routes.js';
+
 // P17 Unit U4 (step 7): the instance card read model.
 export { registerCardRoutes, type CardRoutesDeps } from './card.routes.js';
 export {

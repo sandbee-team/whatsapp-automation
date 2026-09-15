@@ -118,6 +118,8 @@ export {
   resumeInstanceInputSchema,
   resumeInstanceOutputSchema,
   resumeInstanceContract,
+  deleteInstanceOutputSchema,
+  deleteInstanceContract,
   instancesContract,
 } from './instances.js';
 

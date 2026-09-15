@@ -53,6 +53,14 @@ export const enInstancesUi = {
   'instances.detail.pauseError': 'Could not pause this number. Please try again.',
   'instances.detail.resumeSuccess': 'Number back online.',
   'instances.detail.resumeError': 'Could not bring this number online. Please try again.',
+  'instances.detail.delete': 'Delete',
+  'instances.detail.deleteConfirmTitle': 'Delete this number?',
+  'instances.detail.deleteConfirmBody':
+    'This removes the number from your workspace and frees up a slot on your plan for a ' +
+    'replacement. Its message and queue history is kept, not erased. This cannot be undone ' +
+    'from here.',
+  'instances.detail.deleteSuccess': 'Number deleted.',
+  'instances.detail.deleteError': 'Could not delete this number. Please try again.',
   'instances.detail.tabs.overview': 'Overview',
   'instances.detail.tabs.health': 'Health',
   'instances.detail.tabs.queue': 'Queue',

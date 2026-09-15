@@ -17,6 +17,7 @@ import {
   createAuthzTick,
   type RealtimeCtx,
 } from '../modules/realtime/index.js';
+import { createRedisRealtimeSubscriber } from '../modules/realtime/redis-bridge.js';
 import { createWalletRepairedSendSink, refundSend } from '../modules/wallet/index.js';
 import { lookupByKeyPrefix } from '../modules/api-keys/index.js';
 import { bindWalletMetrics } from '../platform/metrics/wallet-metrics.js';
@@ -33,6 +34,15 @@ import { startMetricsServer, type MetricsServerHandle } from '../platform/metric
  * `getUserTotpState` (never duplicates that query inline). Starts the SSE
  * re-authorisation tick after `listen` and stops it before `closeAll`/
  * `app.close` on shutdown.
+ *
+ * Also starts the Redis realtime-bridge SUBSCRIBER (own dedicated connection,
+ * `realtimeBridgeRedis`) before `buildApp`/`listen` - this is the API-side
+ * half of `modules/realtime/redis-bridge.ts` that re-publishes
+ * `session-worker`'s cross-process events (e.g. `instance.qr`) into the
+ * in-process `realtimeHub` for SSE delivery (see the wiring's own comment
+ * below for why this was missing in production). Stopped before
+ * `realtimeHub.closeAll` on shutdown, its connection disconnected alongside
+ * `redis` in the same `finally`.
  */
 
 async function main(): Promise<void> {
@@ -109,6 +119,66 @@ async function main(): Promise<void> {
     metrics: { incrementAuthzTickErrors: realtimeMetrics.incrementAuthzTickErrors },
     logger,
   });
+
+  // FIX (discovered 2026-09-15, first live deployment - QR code never
+  // reached the browser): `session-worker.ts` publishes `instance.qr` (and
+  // every other cross-process real-time event) onto the Redis bridge channel
+  // via `createRedisRealtimePublisher` (pairing.ts:100-107 -> that publisher
+  // -> redis-bridge.ts's `publish`). `redis-bridge.ts`'s OWN header comment
+  // describes this as a two-sided bridge - "the worker-side publisher writes
+  // one validated JSON frame ... the API-side subscriber reads it back and
+  // re-publishes into the REAL in-process hub" - but `createRedisRealtimeSubscriber`
+  // was never actually called anywhere in this role (or anywhere else in
+  // production). Every frame the worker published landed on a Redis Pub/Sub
+  // channel with zero subscribers and was silently discarded - confirmed live
+  // by `whatsapp_instances.qr_attempts` incrementing on rows whose QR never
+  // reached any browser. The frontend side (`useLinkStream.ts`) was already
+  // correctly subscribed to the SSE stream; it simply never received
+  // anything because nothing fed the hub from the worker process.
+  //
+  // A SEPARATE Redis connection is required here, never the shared `redis`
+  // handle above: `redis-bridge.ts`'s `CreateRedisRealtimeSubscriberOptions`
+  // takes a full `Redis` client because `.subscribe()` puts a connection into
+  // subscriber mode, after which ioredis can no longer issue ordinary
+  // commands on it (see that file's own doc comment on the option) - `redis`
+  // above is already shared by the rate limiter, wake publishes, and the
+  // card/dashboard deps below and must stay free to issue normal commands.
+  // `createRedis` gives this its own bounded connect timeout / single-retry
+  // behaviour (platform/redis.ts's own "no reconnect loop" comment), so a
+  // Redis that is genuinely unreachable at boot fails `subscriber.start()`
+  // below and takes the whole process down with it (fail-closed at boot,
+  // same discipline as the `DATABASE_URL`/`REDIS_URL` presence checks above).
+  // A connection that drops LATER, mid-life, is the SAME accepted gap
+  // `redis-bridge.ts`'s own header already documents for this whole bridge
+  // ("fire and forget... a message published while the subscriber is down is
+  // simply never delivered... an accepted, documented gap for this phase") -
+  // this is the identical connection factory `session-worker.ts`'s and
+  // `relay.ts`'s own publisher-side connections already use with the same
+  // no-reconnect behaviour, so this wiring is not taking on any new risk
+  // beyond what the bridge's design already accepts; it must never be
+  // "fixed" here with a bespoke reconnect loop the module itself doesn't
+  // have (P15's outbox relay is the documented durable replacement).
+  const realtimeBridgeRedis = createRedis(config.REDIS_URL);
+  const realtimeBridgeSubscriber = createRedisRealtimeSubscriber({
+    redis: realtimeBridgeRedis,
+    env: config.NODE_ENV,
+    hub: realtimeHub,
+    // `RedisRealtimeSubscriberLogger.warn` is `(msg, meta?)` - the OPPOSITE
+    // argument order from `@wp/server-kit`'s own `WpLogger.warn`, which is
+    // pino-shaped `(fields, msg)` (see `createAuthzTick`'s `logger` above,
+    // which takes the shared `logger` export directly because
+    // `AuthzTickLoggerPort` already matches that pino order). Passing
+    // `logger` straight through here would silently hand a STRING as pino's
+    // `fields` object on every call. Same adapter idiom as
+    // `engine/fleet/session-cost-feedback-timer.ts`'s own `logger.warn({},
+    // ...)` wrapper for this identical port-shape mismatch.
+    logger: {
+      warn: (msg, meta) => {
+        logger.warn({}, meta ? `${msg} ${JSON.stringify(meta)}` : msg);
+      },
+    },
+  });
+  await realtimeBridgeSubscriber.start();
 
   const authDeps: AuthDeps = {
     tokenEpochCtx: {
@@ -271,12 +341,20 @@ async function main(): Promise<void> {
       // first, so a rejection there left the app/realtime hub running while
       // `finally` closed the pool underneath them).
       authzTick.stop();
+      // The bridge subscriber stops BEFORE `realtimeHub.closeAll` - it only
+      // unsubscribes/detaches its own `message` listener (redis-bridge.ts's
+      // `stop()` never closes the connection itself, same "caller owns the
+      // handle" discipline every other Redis handle in this file follows),
+      // so no in-flight worker-published frame can call `hub.publish` on a
+      // hub that is already mid-close.
+      await realtimeBridgeSubscriber.stop();
       realtimeHub.closeAll('server_shutdown');
       await app.close();
       await metricsServer.close().catch(() => undefined);
     } finally {
       await pool.end();
       redis.disconnect();
+      realtimeBridgeRedis.disconnect();
     }
   };
   process.on('SIGTERM', () => {
