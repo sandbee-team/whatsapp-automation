@@ -210,6 +210,10 @@ const configSchema = z.object({
   S3_ACCESS_KEY: z.string().min(1).optional(),
   S3_SECRET_KEY: z.string().min(1).optional(),
   S3_BUCKET: z.string().min(1).default('wp-dev'),
+  // Optional: unset for MinIO (dev), REQUIRED for real AWS S3 - see the
+  // `region` comment in platform/storage/object-store.ts for what breaks
+  // without it, and how silently.
+  S3_REGION: z.string().min(1).optional(),
 
   // Platform floor for the per-instance inbound admission ceiling - the DB column overrides per instance; tenants cannot raise it.
   INBOUND_MAX_PER_MINUTE: z.coerce.number().int().positive().default(120),

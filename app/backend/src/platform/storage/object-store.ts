@@ -82,6 +82,21 @@ export function createObjectStoreFromConfig(config: Config): ObjectStore {
     useSSL: config.S3_USE_SSL,
     accessKey: config.S3_ACCESS_KEY,
     secretKey: config.S3_SECRET_KEY,
+    // REQUIRED against real AWS S3, optional against MinIO. Omitting it makes
+    // minio sign every request for its default region (us-east-1); AWS then
+    // rejects the request outright:
+    //   The authorization header is malformed; the region 'us-east-1' is
+    //   wrong; expecting 'ap-south-1'
+    // The endpoint hostname already NAMES the region (s3.ap-south-1.amazonaws
+    // .com) but minio does not parse it out - the signature is computed from
+    // this field alone. Proven live 2026-09-15 on the first AWS deployment:
+    // every session-worker auth-state write failed this way, and because the
+    // failure surfaced inside Baileys' `connection.update` callback the
+    // fail-safe handler tore the socket down BEFORE the QR was ever emitted -
+    // so the panel showed an empty QR frame with no error anywhere. Left
+    // undefined the behaviour is unchanged for MinIO (dev) and for any
+    // S3-compatible service that ignores the region.
+    ...(config.S3_REGION ? { region: config.S3_REGION } : {}),
   });
 
   // minio's `Client` satisfies `S3ClientPort` structurally.
