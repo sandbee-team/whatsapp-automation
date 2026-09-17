@@ -55,6 +55,18 @@ export interface RealtimeHub {
   /** Throws `TooManyConnectionsError` (synchronously, before registering anything) if `input.userId` is already at the per-user cap. */
   connect(input: RealtimeConnectionInput): void;
   /**
+   * Fires whenever `publish` resolves a channel with ZERO subscribed
+   * connections (fix, 2026-09-16 - "QR never reaches the browser" incident:
+   * publishing to a channel nobody is subscribed to used to be a perfectly
+   * silent no-op, indistinguishable from success, which is exactly why the
+   * instance-channel/client-channel mismatch reached production undetected -
+   * see `hub.ts`'s `publish` doc comment for the full chain). Cheap and
+   * non-spammy by design: one counter increment per callback invocation
+   * here, never a log line per dropped frame - `bindRealtimeMetrics` is the
+   * only production binder.
+   */
+  onPublishNoSubscribers(cb: () => void): void;
+  /**
    * Adds `channel` to an ALREADY-connected connection's subscription set
    * (MIN-2 fix: `service.ts` registers a connection's own client channel
    * synchronously via `connect`, then adds owned-instance channels here as

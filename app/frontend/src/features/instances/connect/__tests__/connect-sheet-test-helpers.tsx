@@ -28,6 +28,26 @@ export function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+/**
+ * A never-resolving SSE response, for a test's `fetch` mock to return for any
+ * `/v1/events...` request. `useLinkStream` (fix, 2026-09-16) now acquires an
+ * additional instance-scoped realtime connection
+ * (`lib/sse-instance-stream.ts`) for the whole time the Connect sheet holds
+ * an `activeInstanceId`, so every test that reaches the challenge/linking
+ * stage triggers a real `fetch('/v1/events?instanceId=...')` call. Tests that
+ * only care about the REST flow (not the realtime stream itself) hand this
+ * back so that call resolves to an inert, never-closing stream instead of
+ * falling through to the mock's `unexpected fetch` throw - matching how
+ * `sse.test.ts`'s own fixtures model a "connection stays open, nothing to
+ * assert about it" case.
+ */
+export function neverEndingSseResponse(): Response {
+  return new Response(new ReadableStream({ pull: () => undefined }), {
+    status: 200,
+    headers: { 'content-type': 'text/event-stream' },
+  });
+}
+
 export function renderConnectSheet(locale: Locale = 'en'): void {
   const rootRoute = createRootRoute({
     component: () => <ConnectSheet open onOpenChange={() => undefined} />,

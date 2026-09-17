@@ -96,6 +96,11 @@ describe('GET /v1/events (connection cap TOCTOU)', () => {
       closeAll: () => {},
       onDrop: () => {},
       onConnectionCountChange: () => {},
+      // Added alongside the new `onPublishNoSubscribers` hook (fix,
+      // 2026-09-16 - "QR never reaches the browser" incident's metrics
+      // signal, see hub.ts's `publish` doc comment) - this fake never calls
+      // `publish`, so a no-op is all this test needs.
+      onPublishNoSubscribers: () => {},
       replaySince: () => ({ kind: 'resync' }),
     };
 

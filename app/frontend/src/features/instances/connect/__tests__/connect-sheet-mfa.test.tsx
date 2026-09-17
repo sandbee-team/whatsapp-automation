@@ -11,7 +11,7 @@ import {
 import { I18nProvider } from '@wp/ui';
 import { setAccessToken } from '../../../../lib/api-client.js';
 import { ConnectSheet } from '../ConnectSheet.js';
-import { INSTANCE_ID, jsonResponse } from './connect-sheet-test-helpers.js';
+import { INSTANCE_ID, jsonResponse, neverEndingSseResponse } from './connect-sheet-test-helpers.js';
 
 /**
  * connect-sheet-mfa.test.tsx (P26b, security follow-up) - the two-factor
@@ -171,6 +171,13 @@ describe('ConnectSheet - MFA stages', () => {
             meta: { requestId: 'r2' },
           }),
         );
+      }
+      if (url.startsWith('/v1/events')) {
+        // FIX (2026-09-16): this test reaches the 'method' stage, which now
+        // holds an `activeInstanceId` and so opens an instance-scoped SSE
+        // connection (`useLinkStream` / `lib/sse-instance-stream.ts`) - see
+        // `neverEndingSseResponse`'s doc comment.
+        return Promise.resolve(neverEndingSseResponse());
       }
       throw new Error(`unexpected fetch: ${method} ${url}`);
     });

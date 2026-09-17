@@ -55,4 +55,34 @@ describe('bindRealtimeMetrics - re-bind idempotency', () => {
     const value = await counterValue(text, 'wp_sse_drops_total{reason="server_shutdown"}');
     expect(value).toBe(1);
   });
+
+  it('binding_the_same_hub_to_the_same_registry_twice_does_not_double_count_a_no_subscriber_publish', async () => {
+    // Same re-bind-idempotency shape as the drops test above, applied to the
+    // new `wp_sse_publish_no_subscribers_total` counter (fix, 2026-09-16 -
+    // "QR never reaches the browser" incident: this counter is the signal
+    // that makes a channel-scope mismatch like that one visible instead of
+    // silent - see hub.ts's `publish` doc comment).
+    const registry = createMetricsRegistry();
+    const hub = createRealtimeHub({ replayRingSize: 10 });
+
+    bindRealtimeMetrics(hub, registry);
+    bindRealtimeMetrics(hub, registry);
+
+    const clientId = randomUUID();
+    // No connection is ever registered on this client's channel - every
+    // publish below resolves to zero subscribers.
+    hub.publish({
+      type: 'instance.pacing_changed',
+      clientId,
+      instanceId: randomUUID(),
+      band: 'HIGH',
+      tier: 1,
+      effDailyCap: 100,
+      configVersion: 1,
+    });
+
+    const text = await registry.metricsText();
+    const value = await counterValue(text, 'wp_sse_publish_no_subscribers_total');
+    expect(value).toBe(1);
+  });
 });

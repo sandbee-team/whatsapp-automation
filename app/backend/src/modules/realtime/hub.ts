@@ -19,17 +19,13 @@ import {
  * Redis pub/sub behind the SAME `publish` shape - nothing above this module
  * needs to change when that happens.
  *
- * U3b seam (documented here, not built here): `dropWhere`, `onDrop`, and
- * `onConnectionCountChange` are this unit's hooks for the periodic authz
- * re-check tick (`SSE_AUTHZ_TICK_MS`, already in platform/config.ts) and for
- * metrics wiring - U3b binds to these, it does not modify this file's
- * connect/publish/disconnect logic.
+ * U3b seam: `dropWhere`, `onDrop`, `onConnectionCountChange` and
+ * `onPublishNoSubscribers` are hooks for the periodic authz re-check tick
+ * and for metrics wiring (`metrics.ts` binds all four) - callers bind to
+ * these, they do not modify this file's connect/publish/disconnect logic.
  *
- * Public types (`RealtimeHub`, `RealtimeConnectionInput`, `PublishInput`,
- * `ReplayResult`, `SseFrameLike`, `RealtimeConnectionSnapshot`,
- * `CreateRealtimeHubOptions`) plus `TooManyConnectionsError` live in
- * `hub-types.ts` (split out for the workspace's 300-line max-lines lint
- * rule) - re-exported below so every existing importer of this file is
+ * Public types live in `hub-types.ts` (split out for the workspace's
+ * 300-line max-lines rule) - re-exported below so existing importers are
  * unaffected.
  */
 
@@ -84,6 +80,7 @@ export function createRealtimeHub(options: CreateRealtimeHubOptions): RealtimeHu
 
   const dropCallbacks: Array<(reason: DropReason) => void> = [];
   const connectionCountCallbacks: Array<(count: number) => void> = [];
+  const publishNoSubscribersCallbacks: Array<() => void> = [];
 
   function notifyConnectionCountChange(): void {
     const count = connections.size;
@@ -194,8 +191,7 @@ export function createRealtimeHub(options: CreateRealtimeHubOptions): RealtimeHu
       const conn = connections.get(connectionId);
       if (!conn) return;
       conn.sink.close(reason);
-      // `sink.close` -> `onClose` above handles bookkeeping + the onDrop
-      // callback; nothing further to do here.
+      // `sink.close` -> `onClose` above handles bookkeeping + the onDrop callback.
     },
 
     publish(event) {
@@ -224,8 +220,19 @@ export function createRealtimeHub(options: CreateRealtimeHubOptions): RealtimeHu
       const data = JSON.stringify(parsed);
       pushToRing(channel, { id: frameId, event: parsed.type, data });
 
+      // FIX (2026-09-15/16 live incident): `instance.qr` always routed here
+      // to the instance channel, but the browser subscribed client-wide only
+      // - worker publish + bridge subscriber both worked (zero warnings),
+      // this branch just returned, silently. Fixed at the call site
+      // (`sse-instance-stream.ts`); `onPublishNoSubscribers` (a counter, not
+      // per-event logging - `metrics.ts`) makes a future mismatch visible.
       const subscribers = channelIndex.get(channel);
-      if (!subscribers) return;
+      if (!subscribers) {
+        for (const cb of publishNoSubscribersCallbacks) {
+          cb();
+        }
+        return;
+      }
       for (const connectionId of subscribers) {
         const conn = connections.get(connectionId);
         if (!conn) continue;
@@ -272,6 +279,10 @@ export function createRealtimeHub(options: CreateRealtimeHubOptions): RealtimeHu
 
     onConnectionCountChange(cb) {
       connectionCountCallbacks.push(cb);
+    },
+
+    onPublishNoSubscribers(cb) {
+      publishNoSubscribersCallbacks.push(cb);
     },
 
     replaySince(channel, lastEventId) {

@@ -2,8 +2,9 @@ import { metrics as defaultMetrics, type MetricsRegistry } from '@wp/server-kit'
 import type { RealtimeHub } from './hub.js';
 
 /**
- * modules/realtime/metrics.ts (P05 Unit U3b) - registers the four real-time
- * Prometheus metrics named by the phase's observability step:
+ * modules/realtime/metrics.ts (P05 Unit U3b; +1 metric 2026-09-16 fix) -
+ * registers the real-time Prometheus metrics named by the phase's
+ * observability step, plus one added by the fix below:
  *   - `wp_sse_connections` (gauge, no label) - bound to
  *     `hub.onConnectionCountChange`. Registered NOW even though nothing
  *     alerts on it yet - ADR 0010's Centrifugo escalation trigger is
@@ -15,6 +16,16 @@ import type { RealtimeHub } from './hub.js';
  *     the no-op `roles/api.ts` had.
  *   - `wp_sse_authz_tick_errors_total` (counter, no label) - incremented by
  *     `authz-tick.ts` on every failed tick query (core invariant 2).
+ *   - `wp_sse_publish_no_subscribers_total` (counter, no label) - bound to
+ *     `hub.onPublishNoSubscribers` (fix, 2026-09-16 live incident: publishing
+ *     to a channel with zero subscribers was a SILENT no-op indistinguishable
+ *     from success - see `hub.ts`'s `publish` doc comment - which is exactly
+ *     how the `instance.qr` channel-scope mismatch reached production
+ *     undetected). Deliberately a plain counter, not a per-event log line -
+ *     a real deployment can have a brief, harmless window of no-subscriber
+ *     publishes (e.g. a QR frame published the instant before the panel's
+ *     instance-channel connection finishes subscribing), so this is a signal
+ *     to watch a RATE of, never an alert-per-occurrence.
  *
  * `reason` is on `ALLOWED_LABELS` and is not one of the four
  * `INSTANCE_LABELLED_GAUGES`-only tenant-scoped labels, so `wp_sse_drops_total`
@@ -31,11 +42,11 @@ import type { RealtimeHub } from './hub.js';
  * unaffected and register normally.
  *
  * That idempotency covers metric REGISTRATION only unless the hub event
- * callbacks (`hub.onConnectionCountChange`/`hub.onDrop`) are ALSO gated on
- * the same `existing` check - otherwise every re-bind call for the same
- * registry (even with the SAME hub instance) adds another pair of
+ * callbacks (`hub.onConnectionCountChange`/`hub.onDrop`/`hub.onPublishNoSubscribers`)
+ * are ALSO gated on the same `existing` check - otherwise every re-bind call
+ * for the same registry (even with the SAME hub instance) adds another set of
  * callbacks, and a single hub event then increments/sets the same metric
- * multiple times. `bindHubCallbacks` below runs exactly once per registry,
+ * multiple times. The binding logic below runs exactly once per registry,
  * for whichever hub the FIRST `bindRealtimeMetrics(hub, registry)` call for
  * that registry was given - a later call with a DIFFERENT hub for the same
  * registry intentionally does not rebind (documented limitation: this
@@ -49,6 +60,7 @@ export interface RealtimeMetricsHandles {
   dropsTotal: ReturnType<MetricsRegistry['counter']>;
   subscriptionsRefusedTotal: ReturnType<MetricsRegistry['counter']>;
   authzTickErrorsTotal: ReturnType<MetricsRegistry['counter']>;
+  publishNoSubscribersTotal: ReturnType<MetricsRegistry['counter']>;
   /** Pass straight through to `RealtimeCtx.onSubscriptionRefused`. */
   onSubscriptionRefused: () => void;
   /** Pass straight through to `authz-tick.ts`'s `AuthzTickMetricsPort`. */
@@ -81,6 +93,10 @@ export function bindRealtimeMetrics(
       'wp_sse_authz_tick_errors_total',
       'SSE re-authorisation tick query failures',
     ),
+    publishNoSubscribersTotal: registry.counter(
+      'wp_sse_publish_no_subscribers_total',
+      'SSE publish calls that resolved to a channel with zero subscribers',
+    ),
     onSubscriptionRefused: () => {},
     incrementAuthzTickErrors: () => {},
   };
@@ -103,6 +119,9 @@ export function bindRealtimeMetrics(
     });
     hub.onDrop((reason) => {
       handles.dropsTotal.inc({ reason });
+    });
+    hub.onPublishNoSubscribers(() => {
+      handles.publishNoSubscribersTotal.inc();
     });
   }
 

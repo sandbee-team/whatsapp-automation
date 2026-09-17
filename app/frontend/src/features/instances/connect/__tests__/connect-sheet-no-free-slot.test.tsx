@@ -8,6 +8,7 @@ import {
   HOLDER_ID,
   INSTANCE_ID,
   jsonResponse,
+  neverEndingSseResponse,
   renderConnectSheet,
 } from './connect-sheet-test-helpers.js';
 
@@ -96,6 +97,12 @@ describe('ConnectSheet - NO_FREE_SLOT', () => {
             meta: { requestId: 'r5' },
           }),
         );
+      }
+      if (url.startsWith('/v1/events')) {
+        // FIX (2026-09-16): see `neverEndingSseResponse`'s doc comment -
+        // `useLinkStream` now also opens an instance-scoped SSE connection
+        // while the sheet holds an `activeInstanceId`.
+        return Promise.resolve(neverEndingSseResponse());
       }
       throw new Error(`unexpected fetch: ${method} ${url}`);
     });

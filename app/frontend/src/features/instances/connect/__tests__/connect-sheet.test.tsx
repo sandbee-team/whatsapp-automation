@@ -7,6 +7,7 @@ import {
   createInstanceAndChooseQr,
   INSTANCE_ID,
   jsonResponse,
+  neverEndingSseResponse,
   renderConnectSheet,
 } from './connect-sheet-test-helpers.js';
 
@@ -76,6 +77,14 @@ describe('ConnectSheet', () => {
             meta: { requestId: 'r4' },
           }),
         );
+      }
+      if (url.startsWith('/v1/events')) {
+        // FIX (2026-09-16): `useLinkStream` now also opens an instance-scoped
+        // SSE connection (`lib/sse-instance-stream.ts`) for as long as the
+        // sheet holds an `activeInstanceId` - see `neverEndingSseResponse`'s
+        // own doc comment for why this branch exists in every fetch mock
+        // that reaches the method/challenge/linking stage.
+        return Promise.resolve(neverEndingSseResponse());
       }
       throw new Error(`unexpected fetch: ${method} ${url}`);
     });
@@ -164,6 +173,14 @@ describe('ConnectSheet', () => {
           }),
         );
       }
+      if (url.startsWith('/v1/events')) {
+        // FIX (2026-09-16): `useLinkStream` now also opens an instance-scoped
+        // SSE connection (`lib/sse-instance-stream.ts`) for as long as the
+        // sheet holds an `activeInstanceId` - see `neverEndingSseResponse`'s
+        // own doc comment for why this branch exists in every fetch mock
+        // that reaches the method/challenge/linking stage.
+        return Promise.resolve(neverEndingSseResponse());
+      }
       throw new Error(`unexpected fetch: ${method} ${url}`);
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -235,6 +252,14 @@ describe('ConnectSheet', () => {
             meta: { requestId: 'r4' },
           }),
         );
+      }
+      if (url.startsWith('/v1/events')) {
+        // FIX (2026-09-16): `useLinkStream` now also opens an instance-scoped
+        // SSE connection (`lib/sse-instance-stream.ts`) for as long as the
+        // sheet holds an `activeInstanceId` - see `neverEndingSseResponse`'s
+        // own doc comment for why this branch exists in every fetch mock
+        // that reaches the method/challenge/linking stage.
+        return Promise.resolve(neverEndingSseResponse());
       }
       throw new Error(`unexpected fetch: ${method} ${url}`);
     });
