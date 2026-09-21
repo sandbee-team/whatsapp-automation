@@ -3,15 +3,27 @@ import QRCode from 'qrcode';
 import { Badge, Button, useT } from '@wp/ui';
 
 /**
- * QrPanel (P08 U7) - renders the live QR challenge: the payload string as a
- * scannable `<img>` (via `qrcode`'s `toDataURL`), a 45s countdown ring (SVG
- * circle, driven by `expiresAt` vs an injected `now()` so tests can drive it
- * with fake timers deterministically - never a bare `Date.now()`), and the
- * attempts-left `Badge`. On expiry: NO auto-retry timer, ever - only a
- * "Generate a new code" button the user must click, wired to `onRefresh`
- * (`refreshLink`). This is a hard safety/UX invariant (core canon: no silent
- * automatic re-issuance of a bearer credential) and is asserted directly by
+ * QrPanel (P08 U7; 90s window 2026-09-17) - renders the live QR challenge:
+ * the payload string as a scannable `<img>` (via `qrcode`'s `toDataURL`), a
+ * 90s countdown ring (SVG circle, driven by `expiresAt` vs an injected
+ * `now()` so tests can drive it with fake timers deterministically - never a
+ * bare `Date.now()`), and the attempts-left `Badge`. On expiry: NO
+ * auto-retry timer, ever - only a "Generate a new code" button the user must
+ * click, wired to `onRefresh` (`refreshLink`). This is a hard safety/UX
+ * invariant (core canon: no silent automatic re-issuance of a bearer
+ * credential) and is asserted directly by
  * `connect_expired_state_shows_button_never_auto_retries`.
+ *
+ * `totalWindowMs` (below) is the ring's reference span for "how full the
+ * circle looks" - it MUST track `engine/session/pairing.ts`'s `qrTtlMs`
+ * default (90_000) so a fresh QR's ring starts full and drains linearly to
+ * empty over the real window, rather than rendering pinned at "full" for the
+ * first 45s (as it silently would if this stayed at the old 45_000 while
+ * `expiresAt` already reflects a 90s window server-side) and only visibly
+ * counting down for the remainder. There is no "issued at" timestamp on the
+ * wire to derive this from directly - the panel only ever receives
+ * `expiresAt` - so this stays a constant kept in sync with the backend
+ * default rather than a computed value.
  */
 export interface QrPanelProps {
   payload: string | null;
@@ -75,7 +87,7 @@ export function QrPanel({
   const expiresAtMs = expiresAt ? new Date(expiresAt).getTime() : null;
   const remainingMs = expiresAtMs !== null ? Math.max(0, expiresAtMs - now()) : 0;
   const isExpired = expiresAtMs !== null && remainingMs <= 0;
-  const totalWindowMs = 45_000;
+  const totalWindowMs = 90_000;
   const fraction = Math.min(1, Math.max(0, remainingMs / totalWindowMs));
   const dashOffset = RING_CIRCUMFERENCE * (1 - fraction);
   const remainingSeconds = Math.ceil(remainingMs / 1000);

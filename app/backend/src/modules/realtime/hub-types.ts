@@ -116,4 +116,12 @@ export interface CreateRealtimeHubOptions {
    * from `SSE_MAX_CONNECTIONS_PER_USER`.
    */
   maxConnectionsPerUser?: number;
+  /**
+   * Injectable clock (2026-09-17 "first QR always lost" fix) - `subscribeChannel`'s
+   * replay-on-subscribe path (`hub-replay-ring.ts#replayUndeliveredOnSubscribe`)
+   * compares each ring frame's `expiresAt` against this to decide whether a
+   * stale QR gets replayed. Defaults to `Date.now` - test seam only, never
+   * called directly as `Date.now()` inline elsewhere in this module.
+   */
+  now?: () => number;
 }

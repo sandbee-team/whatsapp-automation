@@ -1,5 +1,5 @@
 import { createPool, createTenantDb, createWorkerDb } from '@wp/db';
-import { logger, describeError } from '@wp/server-kit';
+import { logger } from '@wp/server-kit';
 import { FileKeyProvider } from '@wp/server-kit/crypto';
 import { TIMING } from '@wp/domain';
 import { loadConfig } from '../platform/config.js';
@@ -24,6 +24,7 @@ import { bindQueueMetrics } from '../engine/queue/metrics.js';
 import { bootSendLoopFleetWiring } from '../engine/queue/send-loop-worker-wiring.js';
 import { bootHealthEvaluatorLoop } from '../engine/session/session-worker-health-loop-wiring.js';
 import { startMetricsServer, type MetricsServerHandle } from '../platform/metrics/server.js';
+import { bootDiscoveryScanScheduler } from './session-worker-discovery-wake-wiring.js';
 
 /**
  * ROLE=session-worker entrypoint - opens Baileys sockets, drives
@@ -34,18 +35,12 @@ import { startMetricsServer, type MetricsServerHandle } from '../platform/metric
  * REDIS_URL -> createPool -> assertDbPreconditionsOrExit -> connect redis* ->
  * assertSignalKeyspacePolicy -> bootWorkerBudget -> compose `SessionWorker`
  * -> boot the send-loop/health-evaluator/groups-sync wirings -> start the
- * metrics listener (P25 U2) -> start the discovery timer (5000ms +/- 2000ms
- * jitter) -> register SIGTERM/SIGINT ONCE -> `createDrain`. Composition
- * lives in `engine/session/session-worker-composition.ts`, outside `roles/`.
+ * metrics listener (P25 U2) -> start the discovery scan scheduler (5000ms
+ * +/- 2000ms jittered poll, PLUS a fleet-wide pub/sub wake as of 2026-09-17 -
+ * see `session-worker-discovery-wake-wiring.ts`'s own doc comment) ->
+ * register SIGTERM/SIGINT ONCE -> `createDrain`. Composition lives in
+ * `engine/session/session-worker-composition.ts`, outside `roles/`.
  */
-
-const SCAN_INTERVAL_BASE_MS = 5000;
-const SCAN_INTERVAL_JITTER_MS = 2000;
-
-function scanIntervalMs(): number {
-  const jitter = (Math.random() * 2 - 1) * SCAN_INTERVAL_JITTER_MS;
-  return SCAN_INTERVAL_BASE_MS + jitter;
-}
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -165,29 +160,26 @@ async function main(): Promise<void> {
 
   const healthLoop = bootHealthEvaluatorLoop({ pool, tenantDb: createTenantDb(pool) });
 
-  let timerHandle: ReturnType<typeof setTimeout> | undefined;
-  let stopped = false;
+  // Discovery scan scheduler (5000ms+/-2000ms jittered poll, unconditional -
+  // PLUS the 2026-09-17 fleet-wide pub/sub wake that shortens the average
+  // wait for the common case) - see session-worker-discovery-wake-wiring.ts's
+  // own doc comment for the full pub/sub-is-a-latency-optimisation rationale.
+  const discoveryScanScheduler = bootDiscoveryScanScheduler({
+    env: config.NODE_ENV,
+    redisCtl,
+    worker,
+    sendLoopWiring,
+    logger,
+  });
 
-  function scheduleNext(): void {
-    if (stopped) return;
-    timerHandle = setTimeout(() => {
-      void worker
-        .runOneScanIteration()
-        .then(() => sendLoopWiring.reconcile())
-        .catch((err: unknown) => {
-          logger.error({}, `session-worker scan iteration failed: ${describeError(err)}`);
-        })
-        .finally(scheduleNext);
-    }, scanIntervalMs());
-  }
-  // P25 U2 (step 3): a SEPARATE listener, before the scan timer starts.
+  // P25 U2 (step 3): a SEPARATE listener, before the scan scheduler starts.
   const metricsServer: MetricsServerHandle = await startMetricsServer({
     bind: config.WP_METRICS_BIND,
     port: config.WP_METRICS_PORT,
     role: 'session-worker',
     env: config.NODE_ENV,
   });
-  scheduleNext();
+  await discoveryScanScheduler.start();
 
   console.log(
     `session-worker role started (workerId=${workerId}, sessionCap=${String(sessionCap)}, ` +
@@ -243,13 +235,10 @@ async function main(): Promise<void> {
         return;
       }
       drainStarted = true;
-      stopped = true;
-      if (timerHandle !== undefined) {
-        clearTimeout(timerHandle);
-      }
       feedbackTimer.stop();
       groupsSyncTimer.stop();
       healthLoop.stop();
+      void discoveryScanScheduler.stop(); // best-effort, never blocks the drain below.
       void metricsServer.close(); // best-effort, never blocks the drain below.
 
       const drain = buildSessionWorkerDrain({

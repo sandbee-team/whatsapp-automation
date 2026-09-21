@@ -17,6 +17,7 @@ import {
 import { getUserTotpState } from '../../identity/index.js';
 import { createCountingNoOpRepairedSendSink } from '../../queue/index.js';
 import { publishWake } from '../../../engine/queue/wake.js';
+import { publishDiscoveryWake } from '../../../engine/fleet/discovery-wake.js';
 
 /**
  * instances-routes-test-support.ts (P08 Unit U6c) - the SAME
@@ -114,7 +115,15 @@ export async function buildInstancesApp(deps: BuildInstancesAppDeps): Promise<Fa
       },
     },
     onboarding: { onboardingCtx: { pool: deps.pool } },
-    instances: { entitlementCtx: { pool: deps.pool }, tenantDb: deps.tenantDb },
+    // `publishDiscoveryWake` bound to the real `deps.redis` handle (2026-09-17
+    // fix) - `link-discovery-wake.integration.test.ts` subscribes to the real
+    // fleet-wide channel this publishes on, same idiom `resume` below already
+    // established for its own (per-instance) wake.
+    instances: {
+      entitlementCtx: { pool: deps.pool },
+      tenantDb: deps.tenantDb,
+      publishDiscoveryWake: () => publishDiscoveryWake(deps.redis, deps.config.NODE_ENV),
+    },
     // P16 Unit D (step 8): the real resume route, bound to the real
     // `deps.redis` handle - `resume_publishes_a_wake_and_writes_actor_user_id`
     // subscribes to the real channel `publishWake` publishes on.

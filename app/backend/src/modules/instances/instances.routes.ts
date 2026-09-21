@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { createInstanceInputSchema, linkInstanceInputSchema } from '@wp/contracts';
+import { createInstanceInputSchema } from '@wp/contracts';
 import { PARKED_COPY, PAIRING_MAX_ATTEMPTS } from '@wp/domain';
 import { provisioningRepo } from '../tenancy/index.js';
 import { provisionInstancePacingState } from '../../engine/pacing/provision.js';
@@ -9,7 +9,6 @@ import { requireCanConnect } from '../../platform/http/guards.js';
 import { registerRoute } from '../../platform/http/route-policy.js';
 import * as repo from './repo.js';
 import * as reads from './instance-reads.repo.js';
-import { beginPairing } from './service.js';
 import { setOnlineWithSlotCheck, type OnlineSlotPool } from './instance-online-slot.repo.js';
 import {
   InstanceNotFoundError,
@@ -28,9 +27,11 @@ import {
  * instances.routes.ts (P08 Unit U6c) - the instance link/park routes. Typed
  * errors and the shared helpers live in `instances.routes-support.ts`
  * (max-lines discipline). `DELETE /v1/instances/:id` (2026-09-15 founder
- * request) is a SIBLING file, `delete.routes.ts` - this file already sits at
- * the 300-line max-lines cap, same split rationale `resume.routes.ts`'s own
- * header documents for `POST .../resume`.
+ * request) and `POST /v1/instances/:id/link` (2026-09-17, moved out to make
+ * room for the discovery-wake call) are SIBLING files, `delete.routes.ts`/
+ * `link.routes.ts` - this file already sits at the 300-line max-lines cap,
+ * same split rationale `resume.routes.ts`'s own header documents for
+ * `POST .../resume`.
  *
  * Every `:id` route scopes ownership by `id + clientId` - a foreign or absent
  * instance id returns 404 NOT_FOUND, never a 403-with-existence leak (tenant
@@ -113,38 +114,6 @@ export function registerInstancesRoutes(
           },
           201,
         );
-      });
-    },
-  });
-
-  registerRoute(app, authDeps, {
-    method: 'POST',
-    path: '/v1/instances/:id/link',
-    policy: 'session_mfa',
-    scope: 'instances:link',
-    handler: async (req, reply) => {
-      const requestId = requestIdFor(req);
-      await guarded(reply, requestId, async () => {
-        const auth = req.auth!;
-        const instanceId = instanceIdFrom(req);
-        linkInstanceInputSchema.parse(req.body);
-
-        await withInstanceCtx(deps, auth.clientId, async (ctx, tx) => {
-          await loadOwnedOrNotFound(ctx, instanceId);
-          const ok = await beginPairing(ctx, { instanceId });
-          if (!ok) throw new InstanceNotFoundError();
-
-          await provisioningRepo.insertAuditLog(tx, {
-            clientId: auth.clientId,
-            actorType: 'user',
-            actorUserId: auth.userId,
-            action: 'instance.link_started',
-            targetType: 'instance',
-            targetId: instanceId,
-          });
-        });
-
-        sendSuccess(reply, requestId, { linkState: 'pairing' }, 202);
       });
     },
   });

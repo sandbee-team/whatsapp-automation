@@ -10,6 +10,7 @@ import {
   registerResumeRoute,
   registerCardRoutes,
   registerDeleteInstanceRoute,
+  registerLinkRoute,
   type InstancesRoutesDeps,
   type ResumeRoutesDeps,
   type CardRoutesDeps,
@@ -170,6 +171,12 @@ export async function buildApp(deps: BuildAppDeps): Promise<FastifyInstance> {
   // `InstancesRoutesDeps` that `registerInstancesRoutes` above already
   // requires unconditionally; no new wiring for `roles/api.ts` to do.
   registerDeleteInstanceRoute(app, deps.instances, deps.authDeps);
+  // 2026-09-17 "QR takes 3-12s to appear" fix: POST /v1/instances/:id/link,
+  // split out of instances.routes.ts (max-lines cap) - same unconditional
+  // wiring as the DELETE route above, SAME `InstancesRoutesDeps`.
+  // `publishDiscoveryWake` on that deps object is optional (defaults to a
+  // no-op) so this stays unconditional even for callers that omit it.
+  registerLinkRoute(app, deps.instances, deps.authDeps);
   if (deps.resume) {
     registerResumeRoute(app, deps.resume, deps.authDeps);
   }

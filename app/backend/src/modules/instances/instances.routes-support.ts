@@ -72,8 +72,19 @@ export class ValidationMappedError extends Error {
  * entire session-worker role over). Same shape as `modules/messages/
  * messages.routes-support.ts`'s own `tenantDb` field - `roles/api.ts`
  * wires both from the SAME `createTenantDb(pool)` call.
+ *
+ * `publishDiscoveryWake` (2026-09-17, "QR takes 3-12s to appear" fix) -
+ * `link.routes.ts`'s ONLY consumer, called AFTER `/link`'s pairing-intent
+ * transaction commits (`engine/fleet/discovery-wake.ts`'s own doc comment
+ * explains why this must be fleet-wide, not the per-instance `wake.ts`
+ * channel). Optional + defaulted to a no-op so every existing test fixture
+ * that builds `InstancesRoutesDeps` without it keeps compiling unchanged -
+ * `roles/api.ts` always supplies the real one in production.
  */
-export type InstancesRoutesDeps = GuardDeps & { tenantDb: TenantDb };
+export type InstancesRoutesDeps = GuardDeps & {
+  tenantDb: TenantDb;
+  publishDiscoveryWake?: () => Promise<void> | void;
+};
 
 /**
  * Runs `fn` inside ONE `tenantDb.withTenant` transaction and hands it an

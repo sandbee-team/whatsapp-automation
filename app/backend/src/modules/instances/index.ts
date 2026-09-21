@@ -65,6 +65,11 @@ export { resumeInstance, type ResumeInstanceDeps, type ResumeInstanceInput } fro
 // 2026-09-15 founder request: DELETE /v1/instances/:id (soft delete).
 export { registerDeleteInstanceRoute } from './delete.routes.js';
 
+// 2026-09-17 "QR takes 3-12s to appear" fix: POST /v1/instances/:id/link,
+// split out of instances.routes.ts (max-lines cap) so it could gain the new
+// `publishDiscoveryWake` call - see link.routes.ts's own doc comment.
+export { registerLinkRoute } from './link.routes.js';
+
 // P17 Unit U4 (step 7): the instance card read model.
 export { registerCardRoutes, type CardRoutesDeps } from './card.routes.js';
 export {

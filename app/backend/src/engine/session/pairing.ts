@@ -6,6 +6,30 @@
  * as a QR attempt, never a separate counter. The attempt budget itself comes
  * from `@wp/domain`'s `PAIRING_MAX_ATTEMPTS` (single source of truth shared
  * with `instances.routes.ts`'s attemptsLeft computation, P08 FIX BATCH A A8).
+ *
+ * `qrTtlMs` (2026-09-17 90s UX fix): this is a DISPLAY countdown only - it
+ * never gates when `handleAttempt` runs. `handleAttempt` fires once per
+ * `update.qr` event Baileys itself emits (runner-connection-update.ts's
+ * `onQr` call), and Baileys regenerates its QR on ITS OWN internal
+ * `qrTimeout` (provider/baileys/socket-factory.ts, pinned at a fixed
+ * `45_000` independent of this file), not on this value. So raising
+ * `qrTtlMs` to 90_000 does NOT slow down attempt consumption - attempts
+ * still arrive roughly every ~45s regardless of what this constant is set
+ * to - it only raises how much time the countdown ring/panel PROMISES the
+ * operator before showing "expired". The two are decoupled by construction:
+ * a fresh `instance.qr` publish (this file's `publish` call below) replaces
+ * whatever the panel was showing, on every Baileys refresh, so a still-live
+ * QR is never left stranded behind a stale 90s countdown - the browser
+ * just sees the payload/expiresAt jump forward whenever Baileys hands us a
+ * new one (`useLinkStream.ts`'s `setState` on every `instance.qr` event).
+ * `windowMs` (below) does NOT need to change for this reason: since attempt
+ * spacing is Baileys' ~45s cadence, not `qrTtlMs`, 5 attempts still land at
+ * roughly t=0/45s/90s/135s/180s - comfortably inside the existing 300_000ms
+ * (5 min) window either way. (A prior version of this comment assumed
+ * `qrTtlMs` itself paced attempts, which would have made 5 attempts at 90s
+ * apart exceed a 300s window - traced against `runner-connection-update.ts`
+ * and found that assumption false: `onQr` is driven by Baileys' `qr` event,
+ * never by this file's own timer.)
  */
 import { PAIRING_MAX_ATTEMPTS } from '@wp/domain';
 
@@ -76,7 +100,11 @@ export function createPairingController(deps: CreatePairingControllerDeps): Pair
   const { repoCtx, publish, clock, clientId, instanceId } = deps;
   const maxAttempts = deps.maxAttempts ?? PAIRING_MAX_ATTEMPTS;
   const windowMs = deps.windowMs ?? 300_000;
-  const qrTtlMs = deps.qrTtlMs ?? 45_000;
+  // 90s (2026-09-17, operator-requested): 45s left no time to pick up the
+  // phone, open WhatsApp, and navigate to Settings -> Linked Devices -> Link
+  // a device before the panel showed "expired" - see this file's own module
+  // doc comment for why raising this does not require raising `windowMs`.
+  const qrTtlMs = deps.qrTtlMs ?? 90_000;
 
   /** The one accounting path both `onQr` and `startCodePairing` funnel through. */
   async function handleAttempt(

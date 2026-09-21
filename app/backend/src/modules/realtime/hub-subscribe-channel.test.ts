@@ -165,4 +165,98 @@ describe('createRealtimeHub - subscribeChannel', () => {
     // publish call.
     expect(noSubscriberSignals).toBe(1);
   });
+
+  /**
+   * Regression test for the 2026-09-17 "first QR always lost" incident
+   * (operator report: "first time 5 scans left me kuch nahi aata, uske bad
+   * 4 scans left me qr aata hai"). Root cause: Baileys fires its first `qr`
+   * almost immediately once the socket opens, but the browser's
+   * instance-scoped SSE connection (`sse-instance-stream.ts`) has not
+   * finished its fetch handshake yet, so `hub.subscribeChannel` runs AFTER
+   * `hub.publish` already ran once with zero subscribers. The publish still
+   * landed in the replay ring (`hub-replay-ring.ts`'s `pushToRing` runs
+   * before the subscriber check), but nothing used to drain it for a
+   * connection with no prior frame to resume from (`replaySince` only runs
+   * from a `Last-Event-ID` header a first-time connection can never send).
+   * `subscribeChannel` now replays that ring unconditionally - this test
+   * proves the frame the connection missed while subscribing now arrives
+   * the moment `subscribeChannel` runs, with no client-side timing change.
+   */
+  it('a_connection_that_subscribes_after_a_qr_was_published_still_receives_that_qr', () => {
+    const hub = createRealtimeHub({ replayRingSize: 10 });
+    const clientId = randomUUID();
+    const instanceId = randomUUID();
+    const instanceChannel = `client:${clientId}:instance:${instanceId}`;
+
+    // The worker's `pairing.ts` publishes the first QR before any browser
+    // connection has reached `subscribeChannel` for this instance - exactly
+    // the race this fix closes.
+    hub.publish({
+      type: 'instance.qr',
+      clientId,
+      instanceId,
+      payload: 'first-qr-payload',
+      expiresAt: new Date(Date.now() + 90_000).toISOString(),
+      attemptsLeft: 5,
+    });
+
+    const connectionId = randomUUID();
+    const sink = fakeSink();
+    hub.connect({
+      connectionId,
+      userId: randomUUID(),
+      sessionId: randomUUID(),
+      clientId,
+      epoch: 0,
+      channels: [`client:${clientId}`],
+      sink: sink.sink,
+    });
+
+    // The browser's second, instance-scoped connection reaches this call
+    // only once its own fetch handshake resolves - moments after the QR
+    // above was already published into the (now subscriber-less) ring.
+    hub.subscribeChannel(connectionId, instanceChannel);
+
+    expect(sink.written).toHaveLength(1);
+    expect(JSON.parse(sink.written[0]!.data)).toMatchObject({
+      type: 'instance.qr',
+      payload: 'first-qr-payload',
+    });
+  });
+
+  it('an_already_expired_qr_in_the_ring_is_never_replayed_on_subscribe', () => {
+    // Bound tightly (per this fix's own safety requirement): a QR is a
+    // bearer credential, and a stale one must not be handed to a late
+    // subscriber as if it were still live - `QrPanel.tsx`'s own `isExpired`
+    // path is what a live (non-replayed) expired QR renders as; a replay
+    // must never bypass that by resurrecting a dead credential.
+    const hub = createRealtimeHub({ replayRingSize: 10, now: () => 1_000_000 });
+    const clientId = randomUUID();
+    const instanceId = randomUUID();
+    const instanceChannel = `client:${clientId}:instance:${instanceId}`;
+
+    hub.publish({
+      type: 'instance.qr',
+      clientId,
+      instanceId,
+      payload: 'stale-qr-payload',
+      expiresAt: new Date(999_000).toISOString(), // already in the past vs `now`
+      attemptsLeft: 5,
+    });
+
+    const connectionId = randomUUID();
+    const sink = fakeSink();
+    hub.connect({
+      connectionId,
+      userId: randomUUID(),
+      sessionId: randomUUID(),
+      clientId,
+      epoch: 0,
+      channels: [`client:${clientId}`],
+      sink: sink.sink,
+    });
+    hub.subscribeChannel(connectionId, instanceChannel);
+
+    expect(sink.written).toHaveLength(0);
+  });
 });

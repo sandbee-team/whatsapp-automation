@@ -5,11 +5,17 @@ import { I18nProvider, type Locale } from '@wp/ui';
 import { QrPanel } from '../QrPanel.js';
 
 /**
- * qr-panel.test.tsx (P08 U7) - proves the 45s countdown ring/attempts-left
- * label track an injected `now()` (fake-timer friendly, never a bare
- * `Date.now()`), and that the EXPIRED state renders ONLY a "Generate a new
- * code" button - no timer of any kind ever calls `onRefresh` by itself
- * (`connect_expired_state_shows_button_never_auto_retries`).
+ * qr-panel.test.tsx (P08 U7; 90s window 2026-09-17) - proves the countdown
+ * ring/attempts-left label track an injected `now()` (fake-timer friendly,
+ * never a bare `Date.now()`), that the EXPIRED state renders ONLY a
+ * "Generate a new code" button - no timer of any kind ever calls `onRefresh`
+ * by itself (`connect_expired_state_shows_button_never_auto_retries`) - and
+ * that the ring's fill fraction tracks the real 90s reference window, not
+ * the old 45s one (`a_fresh_90s_qr_ring_is_half_drained_at_the_45s_midpoint_
+ * not_still_full`). The first two tests below use a 45s `expiresAt` fixture
+ * deliberately - `qr-seconds-left`/expiry are driven purely by `expiresAt`
+ * vs `now`, independent of `totalWindowMs`, so a 45s fixture remains a valid
+ * (if shorter-than-production-default) countdown to exercise.
  */
 
 function renderQrPanel(
@@ -101,5 +107,45 @@ describe('QrPanel', () => {
     const secondsLabelAfter = screen.getByTestId('qr-seconds-left').textContent;
     expect(secondsLabelAfter).toBe('25');
     expect(Number(secondsLabelAfter)).toBeLessThan(Number(secondsLabelBefore));
+  });
+
+  /**
+   * Regression test for the 90s-window fix (2026-09-17): `totalWindowMs`
+   * (the ring's "how full does this look" reference span) must track
+   * `pairing.ts`'s real 90_000 default. Before this fix it was still
+   * hardcoded at 45_000, so a fresh 90s-window QR (remainingMs=90_000)
+   * computed `fraction = min(1, 90000/45000) = 1` for its entire first 45
+   * seconds - the ring rendered stuck at "full" and only started visibly
+   * draining halfway through the real window, which would read to an
+   * operator as "the countdown isn't moving".
+   */
+  it('a_fresh_90s_qr_ring_is_half_drained_at_the_45s_midpoint_not_still_full', async () => {
+    vi.useFakeTimers();
+    const expiresAt = new Date('2026-01-01T00:01:30.000Z').toISOString(); // now + 90s
+    let currentTime = new Date('2026-01-01T00:00:00.000Z').getTime();
+
+    renderQrPanel({ expiresAt, now: () => currentTime });
+
+    const ringAt0s = screen
+      .getByTestId('qr-countdown-ring')
+      .querySelectorAll('circle')[1]!.getAttribute('stroke-dashoffset');
+    // Full window remaining -> the progress circle is fully drawn (offset 0).
+    expect(Number(ringAt0s)).toBeCloseTo(0, 1);
+
+    currentTime = new Date('2026-01-01T00:00:45.000Z').getTime(); // the old 45s TTL's full duration
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(45_000);
+    });
+
+    const circumference = 2 * Math.PI * 20;
+    const ringAt45s = Number(
+      screen
+        .getByTestId('qr-countdown-ring')
+        .querySelectorAll('circle')[1]!.getAttribute('stroke-dashoffset'),
+    );
+    // Exactly half the 90s window has elapsed - the ring must be half-drained
+    // (offset ~= half the circumference), never still at/near 0 (which the
+    // pre-fix 45_000 reference span would have produced).
+    expect(ringAt45s).toBeCloseTo(circumference / 2, 0);
   });
 });

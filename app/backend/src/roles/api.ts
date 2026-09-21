@@ -11,6 +11,7 @@ import type { AuthDeps } from '../platform/http/auth-plugin.js';
 import { getUserTotpState } from '../modules/identity/index.js';
 import { createInstanceOwnership } from '../modules/instances/index.js';
 import { publishWake } from '../engine/queue/wake.js';
+import { publishDiscoveryWake } from '../engine/fleet/discovery-wake.js';
 import {
   createRealtimeHub,
   bindRealtimeMetrics,
@@ -224,7 +225,14 @@ async function main(): Promise<void> {
       },
     },
     onboarding: { onboardingCtx: { pool } },
-    instances: { entitlementCtx: { pool }, tenantDb },
+    // 2026-09-17 fix: fleet-wide discovery wake for `POST .../link`, bound to
+    // the SAME `redis` handle `resume`/`broadcasts` below use for their own
+    // per-instance wake (see `engine/fleet/discovery-wake.ts`'s own doc).
+    instances: {
+      entitlementCtx: { pool },
+      tenantDb,
+      publishDiscoveryWake: () => publishDiscoveryWake(redis, config.NODE_ENV),
+    },
     // P16 Unit D (step 8): human-only resume - `publishWake` bound to the
     // SAME `redis` control-plane handle every other wake publisher in this
     // role uses (see wake.ts's own header comment on the redis-ctl tier).

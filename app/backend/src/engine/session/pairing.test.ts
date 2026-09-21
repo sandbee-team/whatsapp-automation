@@ -74,7 +74,7 @@ describe('createPairingController.onQr', () => {
       clientId: 'client-1',
       instanceId: 'inst-1',
       payload: 'qr-string-1',
-      expiresAt: new Date(1_000 + 45_000).toISOString(),
+      expiresAt: new Date(1_000 + 90_000).toISOString(),
       attemptsLeft: 4,
     });
   });
@@ -211,7 +211,7 @@ describe('createPairingController.startCodePairing', () => {
       clientId: 'client-1',
       instanceId: 'inst-1',
       payload: 'ABCD1234',
-      expiresAt: new Date(2_000 + 45_000).toISOString(),
+      expiresAt: new Date(2_000 + 90_000).toISOString(),
       attemptsLeft: 4,
     });
   });

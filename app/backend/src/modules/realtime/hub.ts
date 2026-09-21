@@ -3,6 +3,12 @@ import { realtimeEventSchema } from '@wp/contracts';
 import { assertIdsOnly, REALTIME_PAYLOAD_KEYS, type RealtimePayloadEventType } from '@wp/domain';
 import type { SseSink } from '../../platform/http/sse.js';
 import {
+  createReplayRings,
+  pushToRing,
+  replaySince as replaySinceRing,
+  replayUndeliveredOnSubscribe,
+} from './hub-replay-ring.js';
+import {
   TooManyConnectionsError,
   type CreateRealtimeHubOptions,
   type DropReason,
@@ -26,7 +32,11 @@ import {
  *
  * Public types live in `hub-types.ts` (split out for the workspace's
  * 300-line max-lines rule) - re-exported below so existing importers are
- * unaffected.
+ * unaffected. The replay ring's storage + both its read paths
+ * (`replaySince`'s Last-Event-ID resume, and the new subscribe-time replay
+ * this file's `subscribeChannel` now performs) live in `hub-replay-ring.ts`
+ * (same split, same reason - see that file's own doc comment for the
+ * "first QR always lost" fix this enables).
  */
 
 export {
@@ -51,12 +61,6 @@ interface Connection {
   sink: SseSink;
 }
 
-interface RingEntry {
-  id: string;
-  event: string;
-  data: string;
-}
-
 function snapshotOf(conn: Connection): RealtimeConnectionSnapshot {
   return {
     connectionId: conn.connectionId,
@@ -71,12 +75,13 @@ function snapshotOf(conn: Connection): RealtimeConnectionSnapshot {
 export function createRealtimeHub(options: CreateRealtimeHubOptions): RealtimeHub {
   const bootNonce = randomUUID();
   let seq = 0;
+  const now = options.now ?? Date.now;
 
   const connections = new Map<string, Connection>();
   /** channel name -> set of connectionIds subscribed to it. */
   const channelIndex = new Map<string, Set<string>>();
-  /** channel name -> bounded replay ring of the last `replayRingSize` frames. */
-  const replayRings = new Map<string, RingEntry[]>();
+  /** channel name -> bounded replay ring of the last `replayRingSize` frames - storage + reads live in `hub-replay-ring.ts`. */
+  const replayRings = createReplayRings();
 
   const dropCallbacks: Array<(reason: DropReason) => void> = [];
   const connectionCountCallbacks: Array<(count: number) => void> = [];
@@ -111,18 +116,6 @@ export function createRealtimeHub(options: CreateRealtimeHubOptions): RealtimeHu
       if (set.size === 0) {
         channelIndex.delete(channel);
       }
-    }
-  }
-
-  function pushToRing(channel: string, entry: RingEntry): void {
-    let ring = replayRings.get(channel);
-    if (!ring) {
-      ring = [];
-      replayRings.set(channel, ring);
-    }
-    ring.push(entry);
-    if (ring.length > options.replayRingSize) {
-      ring.shift();
     }
   }
 
@@ -185,6 +178,22 @@ export function createRealtimeHub(options: CreateRealtimeHubOptions): RealtimeHu
       if (conn.channels.has(channel)) return;
       conn.channels.add(channel);
       indexChannel(channel, conn.connectionId);
+
+      // FIX (2026-09-17, "first QR always lost"): a connection reaching this
+      // path has never had the chance to receive a frame on `channel` before
+      // (it did not exist as a subscriber until the line above) - there is no
+      // `Last-Event-ID` for it to resume from, and none should be expected of
+      // it (routes.ts never asks a fresh connection to invent one). Without
+      // this, a frame published to `channel` in the gap between the socket
+      // opening (Baileys firing its near-immediate first `qr`) and THIS call
+      // resolving (the browser's second, instance-scoped SSE connection
+      // finishing its own fetch handshake - sse-instance-stream.ts) landed in
+      // the ring (hub-replay-ring.ts's `pushToRing` runs on every publish,
+      // subscribers or not) but was never drained for anyone - see that
+      // file's own module doc for the full incident chain. Expiry-filtered
+      // (a QR is a credential): a frame whose `expiresAt` has already passed
+      // is skipped, never replayed as if still live.
+      replayUndeliveredOnSubscribe(replayRings, channel, (frame) => conn.sink.write(frame), now);
     },
 
     disconnect(connectionId, reason) {
@@ -216,9 +225,8 @@ export function createRealtimeHub(options: CreateRealtimeHubOptions): RealtimeHu
           ? `client:${event.clientId}:instance:${event.instanceId}`
           : `client:${event.clientId}`;
 
-      const frameId = nextFrameId();
-      const data = JSON.stringify(parsed);
-      pushToRing(channel, { id: frameId, event: parsed.type, data });
+      const frame = { id: nextFrameId(), event: parsed.type, data: JSON.stringify(parsed) };
+      pushToRing(replayRings, options.replayRingSize, channel, frame);
 
       // FIX (2026-09-15/16 live incident): `instance.qr` always routed here
       // to the instance channel, but the browser subscribed client-wide only
@@ -236,7 +244,7 @@ export function createRealtimeHub(options: CreateRealtimeHubOptions): RealtimeHu
       for (const connectionId of subscribers) {
         const conn = connections.get(connectionId);
         if (!conn) continue;
-        conn.sink.write({ id: frameId, event: parsed.type, data });
+        conn.sink.write(frame);
       }
     },
 
@@ -286,15 +294,7 @@ export function createRealtimeHub(options: CreateRealtimeHubOptions): RealtimeHu
     },
 
     replaySince(channel, lastEventId) {
-      const ring = replayRings.get(channel);
-      if (!ring) {
-        return { kind: 'resync' };
-      }
-      const index = ring.findIndex((entry) => entry.id === lastEventId);
-      if (index === -1) {
-        return { kind: 'resync' };
-      }
-      return { kind: 'frames', frames: ring.slice(index + 1) };
+      return replaySinceRing(replayRings, channel, lastEventId);
     },
   };
 }
