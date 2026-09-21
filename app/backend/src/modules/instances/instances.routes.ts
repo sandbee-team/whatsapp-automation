@@ -3,6 +3,7 @@ import { createInstanceInputSchema } from '@wp/contracts';
 import { PARKED_COPY, PAIRING_MAX_ATTEMPTS } from '@wp/domain';
 import { provisioningRepo } from '../tenancy/index.js';
 import { provisionInstancePacingState } from '../../engine/pacing/provision.js';
+import { readQrCache } from '../../engine/session/qr-cache.js';
 import type { AuthDeps } from '../../platform/http/auth-plugin.js';
 import { requestIdFor, sendSuccess } from '../../platform/http/error-mapper.js';
 import { requireCanConnect } from '../../platform/http/guards.js';
@@ -169,6 +170,27 @@ export function registerInstancesRoutes(
         const status = await withInstanceCtx(deps, auth.clientId, (ctx) =>
           loadOwnedOrNotFound(ctx, instanceId),
         );
+
+        // REST QR fallback (Task 1, "first QR lost" fix, 2026-09-22): reads
+        // the SAME per-instance cache `qr-cache.ts`'s write side populates on
+        // every worker-side `instance.qr` publish - see that module's own
+        // doc for why this closes the race the SSE-only path could not.
+        // Ownership is already established above (`loadOwnedOrNotFound`
+        // 404s a foreign/absent instance BEFORE this ever runs) - the cache
+        // read itself is additionally client-scoped by construction
+        // (`qrCache` key includes `auth.clientId`), so this never loosens
+        // the route's existing auth/tenant-isolation policy. `deps.qrCache`
+        // absent (e.g. a test fixture that predates this fix) simply yields
+        // `null` - identical to a real cache miss.
+        const cachedQr = deps.qrCache
+          ? await readQrCache(deps.qrCache.redis, {
+              env: deps.qrCache.env,
+              clientId: auth.clientId,
+              instanceId,
+              now: () => Date.now(),
+            })
+          : null;
+
         sendSuccess(reply, requestId, {
           linkState: status.linkState,
           healthState: status.healthState,
@@ -177,6 +199,8 @@ export function registerInstancesRoutes(
           userActionReason: status.userActionReason,
           attemptsLeft: Math.max(0, PAIRING_MAX_ATTEMPTS - status.qrAttempts),
           maskedNumber: maskedOrNull(status.phoneE164),
+          qr: cachedQr?.payload ?? null,
+          qrExpiresAt: cachedQr?.expiresAt ?? null,
         });
       });
     },

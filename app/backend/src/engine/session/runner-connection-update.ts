@@ -157,6 +157,33 @@ export async function onOpen(
   state.healthState = 'connected';
   state.linkState = 'linked';
 
+  // "Device paused" presence fix (2026-09-22, Task 2) - documented bug in
+  // our EXACT pinned `baileys@7.0.0-rc14` (app/backend/package.json): during
+  // a partial creds update Baileys itself broadcasts a spurious "available"
+  // presence, defeating `markOnlineOnConnect: false`
+  // (provider/baileys/socket-factory.ts:172) FROM INSIDE THE LIBRARY - our
+  // own config option has no effect on that internal broadcast. The
+  // operator then sees the linked device as paused/stalled on the phone.
+  // The standard mitigation mature Baileys deployments use is exactly this:
+  // explicitly call `sendPresenceUpdate('unavailable')` right after the
+  // connection opens, overriding whatever presence Baileys just broadcast
+  // on its own. BEST-EFFORT ONLY - never let this throw into the
+  // connection-open path: `onConnectionUpdateSafe` (this file) tears the
+  // whole socket down on any unexpected error from this function, and a
+  // presence hiccup must never cost the session its connection. Optional
+  // chaining covers a fake socket in tests that predates this field.
+  // REVISIT: when Baileys is upgraded past rc14, re-check whether this
+  // upstream bug is fixed before assuming this call is still needed.
+  try {
+    await sock.sendPresenceUpdate?.('unavailable');
+  } catch (err) {
+    deps.logger.warn('sendPresenceUpdate(unavailable) failed after connection open: ignoring', {
+      instanceId: state.instanceId,
+      clientId: state.clientId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   deps.pairing.onOpen({ sock, teardownWithRelease: ctx.teardownWithRelease });
   deps.publish({
     type: 'instance.health_changed',

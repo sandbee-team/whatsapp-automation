@@ -232,6 +232,12 @@ async function main(): Promise<void> {
       entitlementCtx: { pool },
       tenantDb,
       publishDiscoveryWake: () => publishDiscoveryWake(redis, config.NODE_ENV),
+      // 2026-09-22 REST QR fallback (Task 1, "first QR lost" fix):
+      // `link-status`'s read side for `qr-cache.ts` - the SAME shared
+      // `redis` handle every other plain-command dep above already reuses
+      // (never `realtimeBridgeRedis`, which is pinned in subscriber mode -
+      // see this file's own comment on that connection).
+      qrCache: { redis, env: config.NODE_ENV },
     },
     // P16 Unit D (step 8): human-only resume - `publishWake` bound to the
     // SAME `redis` control-plane handle every other wake publisher in this

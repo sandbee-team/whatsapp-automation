@@ -4,6 +4,7 @@ import { maskPhoneE164 } from '@wp/domain';
 import type { TenantDb, TenantQueryable } from '@wp/db';
 import { sendError } from '../../platform/http/error-mapper.js';
 import type { GuardDeps } from '../../platform/http/guards.js';
+import type { QrCacheRedis } from '../../engine/session/qr-cache.js';
 import type { InstanceCtx } from './repo.js';
 import * as reads from './instance-reads.repo.js';
 
@@ -80,10 +81,20 @@ export class ValidationMappedError extends Error {
  * channel). Optional + defaulted to a no-op so every existing test fixture
  * that builds `InstancesRoutesDeps` without it keeps compiling unchanged -
  * `roles/api.ts` always supplies the real one in production.
+ *
+ * `qrCache` (2026-09-22 REST QR fallback, Task 1 of the "first QR lost"
+ * fix) - `link-status`'s ONLY consumer (`instances.routes.ts`), reads the
+ * QR `engine/session/qr-cache.ts`'s write side persists on every worker-side
+ * `instance.qr` publish. Optional, same "absent means the feature is off,
+ * never a throw" shape as `publishDiscoveryWake` above - every existing test
+ * fixture that builds `InstancesRoutesDeps` without it keeps compiling
+ * unchanged, and `link-status` simply returns `qr: null` when it is absent
+ * (identical to a real cache miss).
  */
 export type InstancesRoutesDeps = GuardDeps & {
   tenantDb: TenantDb;
   publishDiscoveryWake?: () => Promise<void> | void;
+  qrCache?: { redis: QrCacheRedis; env: string };
 };
 
 /**

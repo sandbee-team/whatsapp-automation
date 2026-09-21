@@ -123,6 +123,12 @@ export async function buildInstancesApp(deps: BuildInstancesAppDeps): Promise<Fa
       entitlementCtx: { pool: deps.pool },
       tenantDb: deps.tenantDb,
       publishDiscoveryWake: () => publishDiscoveryWake(deps.redis, deps.config.NODE_ENV),
+      // 2026-09-22 REST QR fallback (Task 1, "first QR lost" fix) - bound to
+      // the SAME real `deps.redis` handle every other plain-command dep
+      // above already reuses, so `instance-link.qr-fallback.integration.
+      // test.ts`'s regression tests exercise the REAL `qr-cache.ts`
+      // read/write path, not a fixture that predates the field.
+      qrCache: { redis: deps.redis, env: deps.config.NODE_ENV },
     },
     // P16 Unit D (step 8): the real resume route, bound to the real
     // `deps.redis` handle - `resume_publishes_a_wake_and_writes_actor_user_id`

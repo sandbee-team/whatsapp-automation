@@ -106,6 +106,16 @@ export const linkStatusOutputSchema = successEnvelope(
     userActionReason: z.string().nullable(),
     attemptsLeft: z.number().int().min(0),
     maskedNumber: maskedNumberSchema,
+    // 2026-09-22 REST QR fallback (Task 1, "first QR lost" fix): present
+    // only while an unexpired QR/pairing-code challenge is cached for this
+    // instance (`qr-cache.ts`) - `null` covers "never issued", "expired",
+    // and "issued but not yet linked to a pairing session" alike, so the
+    // frontend's null-check idiom (`payload: string | null` in
+    // `useLinkStream.ts`) needs no third state. A BEARER CREDENTIAL exactly
+    // like `instanceQrEventSchema.payload` on the SSE side (packages/
+    // contracts/src/app/realtime.ts) - never logged.
+    qr: z.string().nullable(),
+    qrExpiresAt: z.iso.datetime().nullable(),
   }),
 );
 

@@ -36,6 +36,24 @@ import { linkStatus } from '../api.js';
  * `now`/`setInterval`/`clearInterval` are all reachable via injected
  * options so tests can drive this with fake timers deterministically -
  * never a bare `Date.now()`/`setInterval` call inline.
+ *
+ * REST QR FALLBACK (2026-09-22, "first QR lost" fix, Task 1): a QR
+ * published BEFORE this hook's SSE subscription is fully live was
+ * previously lost outright - two earlier fixes (wiring the Redis bridge
+ * subscriber into `roles/api.ts`, then a replay-on-subscribe ring buffer in
+ * the SSE hub) both tightened the PUSH path and neither closed the gap,
+ * confirmed live twice. `GET /link-status` now also carries the current
+ * `qr`/`qrExpiresAt` (`instances.routes.ts`, backed by `qr-cache.ts`'s
+ * server-side Redis cache) - a plain REST read with no subscribe-timing
+ * dependency at all. This hook fetches it immediately on mount (see the
+ * effect below, deliberately NOT gated on `isOpen`/`realtimeState` the way
+ * the existing attemptsLeft/healthState poll is - the Connect sheet is only
+ * ever mounted while open, and the fallback exists precisely for the window
+ * BEFORE `realtimeState` has had a chance to become `'connected'`) and
+ * merges it via `applyLinkStatusResult`: SSE and REST both funnel through
+ * the SAME merge, comparing `expiresAt` rather than trusting arrival order,
+ * so whichever transport's frame is actually newer always wins regardless
+ * of which one happens to arrive second.
  */
 export interface LinkStreamState {
   payload: string | null;
@@ -43,6 +61,42 @@ export interface LinkStreamState {
   attemptsLeft: number | null;
   healthState: HealthStateContract | null;
   maskedNumber: string | null;
+}
+
+function qrExpiresAtMs(expiresAt: string | null): number {
+  if (!expiresAt) return -Infinity;
+  const ms = new Date(expiresAt).getTime();
+  return Number.isFinite(ms) ? ms : -Infinity;
+}
+
+/**
+ * Merges a `link-status` REST response into `prev` using the SAME
+ * "newer `expiresAt` wins" rule the SSE `instance.qr` handler applies
+ * (this file's header comment) - shared by both the immediate on-mount
+ * fetch and the recurring poll below so the two REST call sites can never
+ * disagree on how a QR gets applied.
+ */
+function applyLinkStatusResult(
+  prev: LinkStreamState,
+  result: {
+    attemptsLeft: number;
+    healthState: HealthStateContract;
+    maskedNumber: string | null;
+    qr: string | null;
+    qrExpiresAt: string | null;
+  },
+): LinkStreamState {
+  const next = {
+    ...prev,
+    attemptsLeft: result.attemptsLeft,
+    healthState: result.healthState,
+    maskedNumber: result.maskedNumber,
+  };
+  if (result.qr && qrExpiresAtMs(result.qrExpiresAt) >= qrExpiresAtMs(prev.expiresAt)) {
+    next.payload = result.qr;
+    next.expiresAt = result.qrExpiresAt;
+  }
+  return next;
 }
 
 const INITIAL_STATE: LinkStreamState = {
@@ -106,12 +160,20 @@ export function useLinkStream(options: UseLinkStreamOptions): LinkStreamState {
 
     const unsubQr = subscribeRealtimeEvent('instance.qr', (event) => {
       if (event.instanceId !== instanceId) return;
-      setState((prev) => ({
-        ...prev,
-        payload: event.payload,
-        expiresAt: event.expiresAt,
-        attemptsLeft: event.attemptsLeft,
-      }));
+      // "Newer wins" (see this file's header comment): a QR delivered by
+      // REST poll can race one delivered by SSE for the SAME instance - this
+      // never assumes SSE arrived second just because it is the "fast path".
+      setState((prev) => {
+        if (qrExpiresAtMs(event.expiresAt) < qrExpiresAtMs(prev.expiresAt)) {
+          return { ...prev, attemptsLeft: event.attemptsLeft };
+        }
+        return {
+          ...prev,
+          payload: event.payload,
+          expiresAt: event.expiresAt,
+          attemptsLeft: event.attemptsLeft,
+        };
+      });
     });
 
     const unsubHealth = subscribeRealtimeEvent('instance.health_changed', (event) => {
@@ -125,17 +187,33 @@ export function useLinkStream(options: UseLinkStreamOptions): LinkStreamState {
     };
   }, [instanceId]);
 
+  // REST QR fallback, immediate leg (2026-09-22, see this file's header
+  // comment): fetches `link-status` ONCE as soon as `instanceId` is set,
+  // unconditional on `isOpen`/`realtimeState` - the SSE subscription above
+  // is registered in the SAME render, but a subscription existing does not
+  // mean the hub has actually delivered anything yet (the exact race that
+  // lost the first QR twice in production). This is the guaranteed leg;
+  // the poll effect below and the SSE handler above are both still live and
+  // will overwrite this via the same "newer wins" merge the instant they
+  // have something.
+  useEffect(() => {
+    if (!instanceId) return undefined;
+    let cancelled = false;
+    void linkStatus(instanceId).then((result) => {
+      if (cancelled) return;
+      setState((prev) => applyLinkStatusResult(prev, result));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [instanceId]);
+
   useEffect(() => {
     if (!instanceId || !isOpen || realtimeState === 'connected') return undefined;
 
     const poll = (): void => {
       void linkStatus(instanceId).then((result) => {
-        setState((prev) => ({
-          ...prev,
-          attemptsLeft: result.attemptsLeft,
-          healthState: result.healthState,
-          maskedNumber: result.maskedNumber,
-        }));
+        setState((prev) => applyLinkStatusResult(prev, result));
       });
     };
 

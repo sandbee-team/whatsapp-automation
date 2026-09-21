@@ -16,7 +16,10 @@ import {
  * ownership-scoping + happy-path tests for the six instance link/park
  * routes. Cap/limit and phone-masking tests live in their own sibling files
  * (max-lines discipline) - see instance-link.caps.integration.test.ts and
- * instance-link.masking.integration.test.ts.
+ * instance-link.masking.integration.test.ts. The REST QR fallback
+ * regression tests (2026-09-22, "first QR lost" fix) are their own sibling
+ * too - see instance-link.qr-fallback.integration.test.ts - for the SAME
+ * reason.
  */
 
 let pool: ReturnType<typeof createPool>;
@@ -118,6 +121,13 @@ describe('instance link/park routes', () => {
       userActionReason: null,
       attemptsLeft: 5,
       maskedNumber: null,
+      // REST QR fallback (Task 1, "first QR lost" fix, 2026-09-22): no
+      // worker ever ran `handleAttempt` in this test, so `qr-cache.ts` has
+      // nothing cached for this instance yet - `null` is the correct "no QR
+      // issued" state, same as every field above it before a real Baileys
+      // socket exists. The cache-hit case is its own test below.
+      qr: null,
+      qrExpiresAt: null,
     });
   });
 

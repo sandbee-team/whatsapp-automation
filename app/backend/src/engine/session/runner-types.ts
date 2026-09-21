@@ -59,6 +59,18 @@ export interface FakeableSocket {
   >;
   /** Optional (P24 Unit U3, step 5) - matches `BaileysGroupSocketPort.groupLeave`'s signature. */
   groupLeave?(jid: string): Promise<void>;
+  /**
+   * Optional (2026-09-22, "device paused" presence fix, Task 2) - matches
+   * Baileys' own `sendPresenceUpdate(type: WAPresence, toJid?: string):
+   * Promise<void>` signature (the real socket's `toJid` is never passed by
+   * this codebase's one caller, `onOpen` in `runner-connection-update.ts`,
+   * so it is omitted here rather than widening this fake surface for an
+   * argument nothing uses). Every existing fake in the test suite predates
+   * this field and still type-checks unchanged - `runner-connection-
+   * update.ts` only calls it via `sock.sendPresenceUpdate?.(...)`, never
+   * assumes it is present.
+   */
+  sendPresenceUpdate?(type: 'unavailable'): Promise<void>;
 }
 
 export interface SessionLeaseLike {

@@ -17,6 +17,7 @@ import { socketFactoryLoggerFrom } from '../engine/session/session-worker-runner
 import { bootWorkerBudget } from '../engine/fleet/fleet-wiring.js';
 import { buildSessionWorkerDrain } from '../engine/session/session-worker-drain-wiring.js';
 import { createRedisRealtimePublisher } from '../modules/realtime/redis-bridge.js';
+import { writeQrCache } from '../engine/session/qr-cache.js';
 import { SessionRssRingBuffer, estimateSessionRssSlopeBytes } from '../engine/fleet/sampler.js';
 import { buildSessionCostFeedbackTimer } from '../engine/fleet/session-cost-feedback-timer.js';
 import { buildGroupsSyncTimer } from '../engine/session/session-groups-sync-timer.js';
@@ -138,7 +139,29 @@ async function main(): Promise<void> {
     budgetBytes,
     signalKeystoreMaxRecords: config.SIGNAL_KEYSTORE_MAX_RECORDS,
     maxFieldsPerInstance: config.REDIS_SIG_MAX_FIELDS_PER_INSTANCE,
+    // 2026-09-22 REST QR fallback (Task 1, "first QR lost" fix): every
+    // `instance.qr` publish also fires a write-through to `qr-cache.ts`, so
+    // a browser that has not subscribed to SSE yet can still retrieve the QR
+    // via `GET .../link-status` (see that route's own doc). Purely additive
+    // - `publisher.publish` below (the existing SSE/Redis-bridge path) runs
+    // exactly as before, unconditionally, regardless of the cache write's
+    // outcome or completion order: `void`, fire-and-forget, same idiom as
+    // `wake.ts`'s own `publishWake`. `pairing.ts`'s `publish` port is itself
+    // synchronous and unawaited by its caller, so this stays a plain sync
+    // closure. `writeQrCache` fails open internally (never throws).
     publish: (event) => {
+      if (event.type === 'instance.qr') {
+        void writeQrCache(redisCtl, {
+          env: config.NODE_ENV,
+          clientId: event.clientId,
+          instanceId: event.instanceId,
+          qr: {
+            payload: event.payload,
+            expiresAt: event.expiresAt,
+            attemptsLeft: event.attemptsLeft,
+          },
+        });
+      }
       publisher.publish(event as never);
     },
   });
